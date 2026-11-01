@@ -89,7 +89,7 @@ function answer(v,btn){const c=S.cur;if(c.answered)return;c.answered=true;
  if(!S.noGrade)grade(c.it,ok);
  if(S.silent){S.i++;return next()}
  V.querySelectorAll('.opt').forEach(b=>{const o=c.opts[b.dataset.i];if(o===c.ans)b.classList.add('ok');else if(b===btn)b.classList.add('no');b.disabled=true});
- const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}">${ok?'✔ ¡Exacto!':'✘ Literal del manual:'}<br><b>${esc(c.it.a)}</b>${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}</div><button class="btn" id="nx">Siguiente ›</button>`;
+ const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}">${ok?'✔ ¡Exacto!':'✘ Literal del manual:'}<br><b>${esc(c.it.a)}</b>${c.it.fuente?'<br><span class="muted" style="font-size:.85em">📖 Fuente: '+esc(c.it.fuente)+'</span>':''}${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}</div><button class="btn" id="nx">Siguiente ›</button>`;
  const go=()=>{S.i++;next()};$('#nx').onclick=go;
  if(ok&&S.auto)setTimeout(()=>{if(S.cur===c)go()},650)}
 function finish(){if(S.done)return;S.done=true;clearInterval(TIMER);const n=S.ok+S.ko,pct=n?Math.round(S.ok*100/n):0;
@@ -172,7 +172,7 @@ ${BANK?'<button class="btn alt" id="delb">Quitar banco de este teléfono</button
 <div class="card"><b>Respaldo de tu avance</b><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono. Descarga un respaldo para pasarlo a otro dispositivo.</p>
 <button class="btn alt" id="exp">Descargar respaldo de avance</button><label class="btn alt">Restaurar avance<input type="file" id="impp" accept=".json" hidden></label>
 <button class="btn alt" id="rst">Borrar mi avance</button></div>
-<p class="muted center">Promoción 2026 · v1.1 · Los datos no salen de tu teléfono.</p>`;
+<p class="muted center">Promoción 2026 · v1.2 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
  const d=$('#delb');if(d)d.onclick=()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;go('ajustes')}};
  $('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()};
