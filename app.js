@@ -31,7 +31,7 @@ function distract(it,n=3){const a=norm(it.a),out=[],used=new Set([a]);
  const pools=[shuf(BANK.items.filter(x=>x.s===it.s)),shuf(BANK.items.filter(x=>x.t===it.t)),shuf(BANK.items)];
  for(const pool of pools)for(const x of pool){const k=norm(x.a);if(out.length>=n)break;if(used.has(k)||k.includes(a)||a.includes(k)||[...used].some(u=>1-lev(u,k)/Math.max(u.length,k.length,1)>.7))continue;used.add(k);out.push(x.a)}
  return out}
-function mkMC(it){return{k:'mc',it,q:it.q,opts:shuf([it.a,...distract(it)]),ans:it.a,lbl:'Opción múltiple'}}
+function mkMC(it){let d=(it.d||[]).filter(x=>norm(x)!==norm(it.a)).slice(0,3);if(d.length<3)d=d.concat(distract(it,3-d.length).filter(x=>!d.includes(x)));return{k:'mc',it,q:it.q,opts:shuf([it.a,...d]),ans:it.a,lbl:'Opción múltiple'}}
 function mkTF(it){const t=Math.random()<.5,cand=t?it.a:(distract(it,1)[0]||it.a);return{k:'tf',it,q:it.q,cand,opts:['Verdadero','Falso'],ans:(t||cand===it.a)?'Verdadero':'Falso',lbl:'Verdadero o falso'}}
 function mkFill(it){const w=it.q.split(/\s+/),c=[];w.forEach((x,i)=>{const n=norm(x);if(n.length>=6&&!STOP.has(n)&&!/\d/.test(n))c.push(i)});
  if(!c.length)return mkMC(it);const i=c[Math.random()*c.length|0],raw=w[i],word=raw.replace(/^[^\wÁÉÍÓÚÑáéíóúñü]+|[^\wÁÉÍÓÚÑáéíóúñü]+$/g,'');
@@ -119,7 +119,8 @@ function noBank(){V.innerHTML=`<div class="card center"><div class="big">🔒</d
 <p>Esta app se publica <b>vacía</b>. Para estudiar, importa el archivo <b>banco_privado.json</b> que te entregaron por chat. Se guarda solo en este teléfono.</p>
 <label class="btn gold center">Importar banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label></div>`;$('#imp').onchange=importBank}
 function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const b=JSON.parse(r.result);
- if(!b.items||!b.temas)throw 0;localStorage.setItem(KB,JSON.stringify(b));BANK=b;toast(`Banco importado: ${b.items.length} preguntas`);go('home')}catch(x){alert('El archivo no es un banco válido.')}};r.readAsText(f)}
+ if(!b.items||!b.temas)throw 0;const old=BANK&&BANK.v||0;if(BANK&&(b.v||0)<old&&!confirm(`Este banco (v${b.v||1}) es más antiguo que el que tienes (v${old}). ¿Reemplazarlo de todos modos?`))return;
+ localStorage.setItem(KB,JSON.stringify(b));BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);go('home')}catch(x){alert('El archivo no es un banco válido.')}};r.readAsText(f)}
 function ring(p){const r=34,c=2*Math.PI*r;return `<svg class="ring" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${r}" fill="none" stroke="#e6e1d3" stroke-width="9"/><circle cx="42" cy="42" r="${r}" fill="none" stroke="#d4af37" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c*Math.min(p,1)} ${c}" transform="rotate(-90 42 42)"/><text x="42" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="#1f3b2d">${Math.round(Math.min(p,1)*100)}%</text></svg>`}
 function home(){const d=P.day.d===today()?P.day.n:0,rk=rankOf(P.xp),due=duePool().length,er=errPool().length;
  V.innerHTML=`<div class="card row">${ring(d/P.goal)}<div class="grow"><b>Meta de hoy: ${d}/${P.goal}</b><div class="muted">🔥 Racha: ${P.st.last===today()||P.st.last===new Date(Date.now()-DAY).toLocaleDateString('sv')?P.st.n:0} días</div>
@@ -164,14 +165,14 @@ function errores(){const L=errPool().sort((a,b)=>st(b.id).ko-st(a.id).ko);
  ${L.length?'<button class="btn" id="pe">Practicar 20 errores</button>':''}</div>`+
  (L.length?L.slice(0,150).map(i=>`<div class="card"><span class="chip">✘ ${st(i.id).ko}</span><span class="chip">${esc(i.s)}</span><p>${esc(i.q)}</p><b>${esc(i.a)}</b></div>`).join(''):'<div class="card center">🎉 Sin errores pendientes.</div>');
  const b=$('#pe');if(b)b.onclick=()=>session({title:'Cuaderno de errores',queue:shuf(L).slice(0,20),mode:'leitner'})}
-function ajustes(){V.innerHTML=`<div class="card"><b>Banco de preguntas</b><p class="muted">${BANK?`${BANK.items.length} preguntas cargadas · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
+function ajustes(){V.innerHTML=`<div class="card"><b>Banco de preguntas</b><p class="muted">${BANK?`${BANK.items.length} preguntas · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
 <label class="btn gold">${BANK?'Reemplazar':'Importar'} banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
 ${BANK?'<button class="btn alt" id="delb">Quitar banco de este teléfono</button>':''}</div>
 <div class="card"><b>Meta diaria</b><input type="number" id="goal" value="${P.goal}" min="5" max="200"></div>
 <div class="card"><b>Respaldo de tu avance</b><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono. Descarga un respaldo para pasarlo a otro dispositivo.</p>
 <button class="btn alt" id="exp">Descargar respaldo de avance</button><label class="btn alt">Restaurar avance<input type="file" id="impp" accept=".json" hidden></label>
 <button class="btn alt" id="rst">Borrar mi avance</button></div>
-<p class="muted center">Promoción 2026 · v1.0 · Los datos no salen de tu teléfono.</p>`;
+<p class="muted center">Promoción 2026 · v1.1 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
  const d=$('#delb');if(d)d.onclick=()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;go('ajustes')}};
  $('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()};
