@@ -1,0 +1,42 @@
+<!doctype html><html lang="es-MX"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f3b2d"><meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg">
+<title>Promoción 2026 · Estudio</title>
+<style>
+@font-face{font-family:'Noto Sans';src:url(fonts/NotoSans-latin.woff2) format('woff2');font-weight:100 900;font-display:swap}
+:root{--v:#1f3b2d;--v2:#2f5a44;--o:#d4af37;--bg:#f4f1e8;--c:#fff;--t:#1c1c1c;--m:#6b6b6b;--ok:#1e8e3e;--no:#c62828}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--t);font-family:'Noto Sans',sans-serif;font-size:16px}
+header{background:var(--v);color:#fff;padding:14px 16px calc(14px);position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;margin:0;flex:1}header button{background:none;border:0;color:#fff;font-size:22px;padding:4px 8px}
+main{max-width:640px;margin:0 auto;padding:14px 14px 90px}
+.card{background:var(--c);border-radius:16px;padding:16px;margin:0 0 12px;box-shadow:0 1px 3px #0001}
+.row{display:flex;gap:10px;align-items:center}.grow{flex:1}.muted{color:var(--m);font-size:13px}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;font:600 15px 'Noto Sans';background:var(--v);color:#fff;margin:6px 0;text-align:left}
+.btn.alt{background:var(--c);color:var(--v);border:2px solid var(--v)}.btn.gold{background:var(--o);color:#1c1c1c}.btn.sm{padding:9px 12px;font-size:14px;display:inline-block;width:auto}
+.btn small{display:block;font-weight:400;opacity:.85;font-size:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid .btn{margin:0;min-height:76px}
+.stat{text-align:center}.stat b{font-size:24px;display:block;color:var(--v)}
+.bar{height:8px;background:#e6e1d3;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--v2)}
+.q{font-size:17px;line-height:1.45;margin:6px 0 14px}.opt{display:block;width:100%;text-align:left;background:#faf8f2;border:2px solid #e2dccb;border-radius:12px;padding:12px;margin:8px 0;font:15px 'Noto Sans';color:var(--t)}
+.opt.ok{border-color:var(--ok);background:#e7f5ea}.opt.no{border-color:var(--no);background:#fdecea}
+.chip{display:inline-block;background:#eee7d4;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px}
+.hud{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;color:var(--m)}
+.fb{padding:12px;border-radius:12px;margin-top:10px;font-size:15px}.fb.ok{background:#e7f5ea}.fb.no{background:#fdecea}
+.words{display:flex;flex-wrap:wrap;gap:6px;min-height:44px;padding:6px;border:2px dashed #d8d0bb;border-radius:12px;margin:8px 0}
+.w{background:var(--v);color:#fff;border:0;border-radius:10px;padding:8px 10px;font:14px 'Noto Sans'}.w.pool{background:#fff;color:var(--v);border:2px solid var(--v)}
+input[type=text],input[type=number],select{width:100%;padding:12px;border-radius:12px;border:2px solid #d8d0bb;font:15px 'Noto Sans'}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e2dccb;display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:10px 0;font:12px 'Noto Sans';color:var(--m)}nav button.on{color:var(--v);font-weight:700}
+nav button span{display:block;font-size:20px}
+.ring{width:84px;height:84px}.big{font-size:40px;text-align:center;margin:10px 0}
+.hidden{display:none}.center{text-align:center}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:9}
+@keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.1)}100%{transform:scale(1)}}.pop{animation:pop .35s}
+</style></head><body>
+<header><h1 id="ttl">Promoción 2026</h1><button id="back" class="hidden" aria-label="Salir">✕</button></header>
+<main id="v"></main>
+<nav id="nav"><button data-r="home" class="on"><span>🏠</span>Inicio</button><button data-r="temas"><span>📚</span>Temas</button><button data-r="errores"><span>📕</span>Errores</button><button data-r="ajustes"><span>⚙️</span>Banco</button></nav>
+<script src="app.js"></script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
+</body></html>
