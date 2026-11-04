@@ -6,6 +6,11 @@ let BANK=null,P=null,TIMER=null,POMO=null;
 const RANKS=['Cadete','Subteniente','Teniente','Cap. 2/o.','Cap. 1/o.','Mayor','Tte. Cor.','Coronel','Gral. Brig.','Gral. Brigada','Gral. Div.'];
 const STOP=new Set('el la los las un una unos unas de del al a en y o u que se su sus por para con sin es son lo le les como más mas este esta estos estas ese esa cual cuál cuando donde dónde qué quien quién ha han ser será sean está están entre sobre todo toda todos todas otro otra otros otras dicha dichas dicho cada mismo misma muy tanto'.split(' '));
 const COL={LM:'#5b4bf5',OP:'#ff7a5c',DH:'#22c39a',AA:'#f0a224',AMM:'#3fb6f0',AT:'#e0405a'};
+/* El banco (~3 MB) se guarda en IndexedDB: localStorage de Safari/iPhone no alcanza (cuota ~5 MB) */
+function idb(){return new Promise((ok,ko)=>{const r=indexedDB.open('p26',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
+function idbSet(k,v){return idb().then(d=>new Promise((ok,ko)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>ok();t.onerror=()=>ko(t.error);t.onabort=()=>ko(t.error)}))}
+function idbGet(k){return idb().then(d=>new Promise((ok,ko)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ko(q.error)}))}
+function idbDel(k){return idb().then(d=>new Promise(ok=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=()=>ok();t.onerror=()=>ok()}))}
 function load(){try{BANK=JSON.parse(localStorage.getItem(KB))}catch(e){BANK=null}
  try{P=JSON.parse(localStorage.getItem(KP))}catch(e){P=null}
  P=Object.assign({it:{},xp:0,st:{n:0,last:''},day:{d:'',n:0},goal:20,hist:[],lv:{},best:{},
@@ -225,9 +230,14 @@ function noBank(){V.innerHTML=`<div class="card hero center"><div class="big">�
 <p class="muted">Esta app se publica <b>vacía</b>. Para estudiar, importa el archivo <b>banco_privado.json</b>. Se guarda solo en este teléfono.</p></div>
 <label class="btn xl">Importar banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <a class="card info" href="#tecnicas" style="margin-top:14px"><b>🧠 ¿Cómo estudia esta app?</b><div class="muted">Repetición espaciada, recuerdo activo, intercalado, pomodoro y más.</div></a>`;$('#imp').onchange=importBank}
-function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const b=JSON.parse(r.result);
- if(!b.items||!b.temas)throw 0;const old=BANK&&BANK.v||0;if(BANK&&(b.v||0)<old&&!confirm(`Este banco (v${b.v||1}) es más antiguo que el que tienes (v${old}). ¿Reemplazarlo de todos modos?`))return;
- localStorage.setItem(KB,JSON.stringify(b));BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);location.hash='#inicio';render()}catch(x){alert('El archivo no es un banco válido.')}};r.readAsText(f)}
+function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onerror=()=>alert('No se pudo leer el archivo.');r.onload=async()=>{let b;
+ try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido ('+x.message+'). Verifica que sea banco_privado.json completo.');return}
+ if(!b||!Array.isArray(b.items)||!b.items.length){alert('El archivo no es un banco válido (no tiene preguntas).');return}
+ if(!Array.isArray(b.temas)){const m={};b.items.forEach(i=>m[i.t]=(m[i.t]||0)+1);b.temas=Object.keys(m).map(k=>({id:k,n:k,count:m[k]}))}
+ b.items=b.items.filter(i=>i&&i.id&&i.q&&i.a!=null);
+ const old=BANK&&BANK.v||0;if(BANK&&(b.v||0)<old&&!confirm(`Este banco (v${b.v||1}) es más antiguo que el que tienes (v${old}). ¿Reemplazarlo de todos modos?`))return;
+ try{await idbSet(KB,b);localStorage.removeItem(KB)}catch(x){try{localStorage.removeItem(KB);localStorage.setItem(KB,JSON.stringify(b))}catch(y){alert('No hay espacio para guardar el banco en este teléfono ('+(y&&y.name||y)+'). Abre la app en Safari normal (no en modo privado).');return}}
+ BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);location.hash='#inicio';try{tema()}catch(_){}render()};r.readAsText(f)}
 
 const saludo=()=>{const h=new Date().getHours();return h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches'};
 const FR=['Lo que repasas hoy es lo que recuerdas el día del examen.','Pocos minutos, todos los días: así se asciende.','Constancia le gana a la memoria de última hora.','Recordar cuesta; por eso funciona.','Sin prisa y sin pausa, Capitán.'];
@@ -325,10 +335,11 @@ VW.mas=()=>{V.innerHTML=`<div class="card hl"><h1>Más</h1></div>
  <div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
  <div class="card"><h3>Respaldo de tu avance</h3><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono.</p>
  <div class="row"><button class="btn sec" id="exp">Descargar respaldo</button><label class="btn sec">Restaurar<input type="file" id="impp" accept=".json" hidden></label><button class="btn peligro" id="rst">Borrar avance</button></div></div>
- <p class="muted center">Promoción 2026 · v2.1 · Los datos no salen de tu teléfono.</p>`;
+ <p class="muted center">Promoción 2026 · v2.2 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
- on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;render()}});
+ on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);idbDel(KB);BANK=null;render()}});
  on('exp',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()});
  $('#impp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.it)throw 0;localStorage.setItem(KP,JSON.stringify(x));load();tema();toast('Avance restaurado')}catch(_){alert('Archivo no válido')}};r.readAsText(e.target.files[0])};
  on('rst',()=>{if(confirm('¿Borrar todo tu avance?')){localStorage.removeItem(KP);load();tema();toast('Avance borrado');render()}})};
 load();tema();if(P.pomoRun)pomoTick();render();
+if(!BANK&&window.indexedDB)idbGet(KB).then(b=>{if(b&&b.items){BANK=b;tema();render()}}).catch(()=>{});
