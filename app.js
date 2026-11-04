@@ -2,7 +2,7 @@
 /* Promoción 2026 · v2.0 · App de estudio (estilo Plan de Ascenso). El banco de preguntas NO viene incluido: se importa en el dispositivo y vive solo en localStorage. */
 const $=s=>document.querySelector(s),V=$('#v');
 const KB='p26_bank',KP='p26_prog',DAY=864e5,INT=[0,0,1,3,7,15];
-let BANK=null,P=null,TIMER=null,POMO=null;
+const KL='p26_lec';let LEC=null,BANK=null,P=null,TIMER=null,POMO=null;
 const RANKS=['Cadete','Subteniente','Teniente','Cap. 2/o.','Cap. 1/o.','Mayor','Tte. Cor.','Coronel','Gral. Brig.','Gral. Brigada','Gral. Div.'];
 const STOP=new Set('el la los las un una unos unas de del al a en y o u que se su sus por para con sin es son lo le les como más mas este esta estos estas ese esa cual cuál cuando donde dónde qué quien quién ha han ser será sean está están entre sobre todo toda todos todas otro otra otros otras dicha dichas dicho cada mismo misma muy tanto'.split(' '));
 const COL={LM:'#5b4bf5',OP:'#ff7a5c',DH:'#22c39a',AA:'#f0a224',AMM:'#3fb6f0',AT:'#e0405a'};
@@ -16,6 +16,7 @@ function load(){try{BANK=JSON.parse(localStorage.getItem(KB))}catch(e){BANK=null
  P=Object.assign({it:{},xp:0,st:{n:0,last:''},day:{d:'',n:0},goal:20,hist:[],lv:{},best:{},
   hd:{},xpd:{},badges:{},retos:{},logs:[],pomo:{work:25,short:5,long:15,every:4,count:0},pomoRun:null,dark:false,cnt:{resp:0,ok:0,maxc:0,cards:0,sim:0,pomos:0}},P||{});
  if(!P.cnt.resp){let r=0,o=0;Object.values(P.it).forEach(s=>{r+=(s.ok||0)+(s.ko||0);o+=s.ok||0});P.cnt.resp=r;P.cnt.ok=o}}
+function prep(){if(!BANK)return;BANK._all=BANK._all||BANK.items;P.bad=P.bad||{};BANK.items=BANK._all.filter(i=>!i.oculto&&!P.bad[i.id]);BANK.cuadros=BANK.cuadros||[]}
 function save(){localStorage.setItem(KP,JSON.stringify(P))}
 const today=()=>new Date().toLocaleDateString('sv');
 const ymd=d=>d.toLocaleDateString('sv');
@@ -140,7 +141,8 @@ function answer(v,btn){const c=S.cur;if(c.answered)return;c.answered=true;
  gainXP(g);checkReto();
  if(S.silent){S.i++;return next()}
  V.querySelectorAll('.opt').forEach(b=>{const o=c.opts[b.dataset.i];if(o===c.ans)b.classList.add('ok');else if(b===btn)b.classList.add('bad');b.disabled=true});
- const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}"><b>${ok?'✔ '+OKS[Math.random()*OKS.length|0]:'✘ Literal del manual:'}</b><br>${esc(c.it.a)}${fuenteH(c.it)}${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}</div><button class="btn xl" id="nx" style="margin-top:10px">Siguiente ›</button>`;
+ const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}"><b>${ok?'✔ '+OKS[Math.random()*OKS.length|0]:'✘ Literal del manual:'}</b><br>${esc(c.it.a)}${fuenteH(c.it)}${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}${c.it.exp?'<div class="exp">💡 '+esc(c.it.exp)+'</div>':''}</div>${!ok?difTabla(c.it):''}<button class="btn xl" id="nx" style="margin-top:10px">Siguiente ›</button><button class="btn sm sec" id="bad" style="margin-top:8px">🚩 Pregunta mala (ocultarla)</button>`;
+ on('bad',()=>{P.bad=P.bad||{};P.bad[c.it.id]=1;save();prep();toast('Pregunta ocultada en este teléfono');$('#bad').disabled=true});
  const go=()=>{S.i++;next()};$('#nx').onclick=go;
  if(ok&&S.auto)setTimeout(()=>{if(S.cur===c)go()},650)}
 function finish(){if(S.done)return;S.done=true;clearInterval(TIMER);const n=S.ok+S.ko,p=n?Math.round(S.ok*100/n):0;
@@ -219,7 +221,7 @@ $('#back').onclick=()=>{if(S&&!S.done){if(!confirm('¿Salir de la sesión? Lo re
 const VW={};
 function render(){clearInterval(TIMER);if(S&&!S.done){S.done=true}setChrome(false);
  const h=(location.hash||'#inicio').slice(1);const[r,...a]=h.split('/');
- const tab={inicio:'inicio',camino:'camino',materia:'camino',tema:'camino',practicar:'practicar',simulacro:'practicar',errores:'practicar',logros:'logros'}[r]||'mas';
+ const tab={cuadros:'inicio',cuadro:'inicio',lectura:'inicio',leer:'inicio',semaforo:'logros',inicio:'inicio',camino:'camino',materia:'camino',tema:'camino',practicar:'practicar',simulacro:'practicar',errores:'practicar',logros:'logros'}[r]||'mas';
  document.querySelectorAll('#nav a').forEach(x=>x.classList.toggle('on',x.dataset.r===tab));
  if(!BANK&&!['mas','pomodoro','tecnicas'].includes(r)){noBank();hdr();return}
  (VW[r]||VW.inicio)(...a.map(decodeURIComponent));hdr();scrollTo(0,0)}
@@ -232,12 +234,13 @@ function noBank(){V.innerHTML=`<div class="card hero center"><div class="big">�
 <a class="card info" href="#tecnicas" style="margin-top:14px"><b>🧠 ¿Cómo estudia esta app?</b><div class="muted">Repetición espaciada, recuerdo activo, intercalado, pomodoro y más.</div></a>`;$('#imp').onchange=importBank}
 function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onerror=()=>alert('No se pudo leer el archivo.');r.onload=async()=>{let b;
  try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido ('+x.message+'). Verifica que sea banco_privado.json completo.');return}
+ if(b&&Array.isArray(b.temas)&&b.temas.length&&b.temas[0].parrafos){try{await idbSet(KL,b)}catch(x){alert('No hay espacio para guardar las lecturas ('+(x&&x.name||x)+').');return}LEC=b;toast(`Lecturas: ${b.temas.length} temas importados`);location.hash='#lectura';render();return}
  if(!b||!Array.isArray(b.items)||!b.items.length){alert('El archivo no es un banco válido (no tiene preguntas).');return}
  if(!Array.isArray(b.temas)){const m={};b.items.forEach(i=>m[i.t]=(m[i.t]||0)+1);b.temas=Object.keys(m).map(k=>({id:k,n:k,count:m[k]}))}
  b.items=b.items.filter(i=>i&&i.id&&i.q&&i.a!=null);
  const old=BANK&&BANK.v||0;if(BANK&&(b.v||0)<old&&!confirm(`Este banco (v${b.v||1}) es más antiguo que el que tienes (v${old}). ¿Reemplazarlo de todos modos?`))return;
  try{await idbSet(KB,b);localStorage.removeItem(KB)}catch(x){try{localStorage.removeItem(KB);localStorage.setItem(KB,JSON.stringify(b))}catch(y){alert('No hay espacio para guardar el banco en este teléfono ('+(y&&y.name||y)+'). Abre la app en Safari normal (no en modo privado).');return}}
- BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);location.hash='#inicio';try{tema()}catch(_){}render()};r.readAsText(f)}
+ BANK=b;prep();const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);location.hash='#inicio';try{tema()}catch(_){}render()};r.readAsText(f)}
 
 const saludo=()=>{const h=new Date().getHours();return h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches'};
 const FR=['Lo que repasas hoy es lo que recuerdas el día del examen.','Pocos minutos, todos los días: así se asciende.','Constancia le gana a la memoria de última hora.','Recordar cuesta; por eso funciona.','Sin prisa y sin pausa, Capitán.'];
@@ -246,7 +249,9 @@ VW.inicio=()=>{const n=P.goal,dn=HD().resp,rk=rankOf(P.xp),due=duePool().length,
  V.innerHTML=`<div class="card hero"><div class="muted">${saludo()} · ${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div><h1 style="margin:.2em 0">¡Vamos por el ascenso!</h1><div class="muted">${FR[Math.floor(Date.parse(today())/DAY)%FR.length]}</div>
  <button class="btn go ${HD().ses?'done':''}" id="g-go" style="margin-top:14px">${HD().ses?'✔ Sesión de hoy hecha · otra ronda':'▶ Empezar sesión guiada'}</button>
  <div class="muted" style="margin-top:8px;font-size:.78rem">${n} preguntas: repaso vencido + errores + nuevas, intercaladas por materia.</div></div>
- <div class="grid3"><div class="stat"><b>${due}</b><span>por repasar</span></div><div class="stat"><b>${er}</b><span>errores</span></div><div class="stat"><b>${nw}</b><span>nuevas</span></div></div>
+ ${(()=>{const r=nextRead();return r?`<a class="card info" href="#leer/${r.id}"><b>📖 Primero lee (${Math.max(1,Math.round(r.chars/1200))} min)</b><div class="muted">${esc(r.titulo.slice(0,80))}${P.lastRead&&P.lastRead.id===r.id?' · retomar':''}</div></a>`:LEC?'':`<a class="card info" href="#lectura"><b>📖 Lectura antes de practicar</b><div class="muted">Importa lecturas_privado.json</div></a>`})()}
+ <div class="grid2"><a class="btn blk" href="#cuadros">🗂️ Mis cuadros<small>Fichas, mnemotecnias y quiz</small></a><a class="btn sec blk" href="#lectura">📖 Lectura<small>${LEC?lecPct(lecTemas())+' % leído':'Texto literal'}</small></a></div>
+ <div class="grid3" style="margin-top:10px"><div class="stat"><b>${due}</b><span>por repasar</span></div><div class="stat"><b>${er}</b><span>errores</span></div><div class="stat"><b>${nw}</b><span>nuevas</span></div></div>
  <a class="card" href="#logros" style="margin-top:14px"><div class="xpbox">${ring(xh/meta,64,'var(--coral)')}<div class="grow"><b>Meta diaria: ${xh}/${meta} XP</b><div class="muted">🎖️ ${rk.name} · ${P.xp} XP · faltan ${rk.next-P.xp} para ${rk.nextName}</div>${barra((P.xp-rk.prev)/(rk.next-rk.prev))}</div></div></a>
  <div class="card"><div class="row"><span style="font-size:1.5rem">${r[0]}</span><div class="grow"><b>Reto del día</b><div class="muted">${r[1]}${P.retos[today()]?' · ✔ cumplido':''}</div></div></div>${barra(retoP(),'var(--grad-c)')}</div>
  <div class="grid2"><button class="btn mint blk" id="g-cards">🃏 Tarjetas<small>Recuerdo activo + autoevaluación</small></button><button class="btn coral blk" id="g-pomo">🍅 Pomodoro<small>${P.pomoRun?'En curso':P.pomo.work+' min de enfoque'}</small></button></div>
@@ -306,7 +311,7 @@ VW.logros=()=>{const rk=rankOf(P.xp),xh=P.xpd[today()]||0,meta=P.goal*10;let w=0
  <div class="grid3"><div class="stat"><b>${racha()}</b><span>días seguidos</span></div><div class="stat"><b>${xh}</b><span>XP hoy / ${meta}</span></div><div class="stat"><b>${w}</b><span>XP 7 días</span></div></div>
  <div class="grid3" style="margin-top:10px"><div class="stat"><b>${P.cnt.resp}</b><span>respuestas</span></div><div class="stat"><b>${pct(P.cnt.ok,P.cnt.resp)}%</b><span>aciertos</span></div><div class="stat"><b>${P.cnt.pomos}</b><span>pomodoros</span></div></div>
  <div class="card" style="margin-top:14px"><h3>Insignias (${Object.keys(P.badges).length}/${BADGES.length})</h3><div class="badges">${BADGES.map(([k,ic,nm,d])=>`<div class="badge ${P.badges[k]?'on':'off'}"><span class="ic" style="background:var(--sup2)">${ic}</span><b>${esc(nm)}</b><br><span class="muted">${esc(d)}</span></div>`).join('')}</div></div>
- <div class="card"><h3>Dominio por materia</h3>${topics().map(t=>{const m=mastery(items(t.id));return `<div class="row" style="margin-top:8px"><span class="grow">${esc(t.n)}</span><span class="muted">${Math.round(m*100)}%</span></div>${barra(m,COL[t.id])}`}).join('')}</div>
+ <a class="card" href="#semaforo"><b>🚦 Semáforo por tema</b><div class="muted">Qué temas están en rojo, amarillo o verde</div></a><div class="card"><h3>Dominio por materia</h3>${topics().map(t=>{const m=mastery(items(t.id));return `<div class="row" style="margin-top:8px"><span class="grow">${esc(t.n)}</span><span class="muted">${Math.round(m*100)}%</span></div>${barra(m,COL[t.id])}`}).join('')}</div>
  <div class="card"><p class="muted">XP: acierto +10 (más bono de combo) · fallo +2 · tarjeta +5 · minuto de pomodoro +1 · sesión completa +15 · reto del día +25.</p></div>`};
 VW.pomodoro=()=>{const p=P.pomo,r=P.pomoRun;const today_p=P.cnt.pomos;
  V.innerHTML=`<div class="card hl center"><h1>🍅 Pomodoro</h1><span class="tag">${r?(r.m==='work'?'Concentración':'Descanso'):'Listo'}</span>
@@ -328,18 +333,67 @@ VW.tecnicas=()=>{V.innerHTML=`<div class="card hl"><a href="#mas" class="muted">
  ['🎖️','Motivación','XP, grados, racha, meta diaria, reto del día e insignias.']].map(([i,t,d])=>`<div class="card"><h3>${i} ${t}</h3><div class="muted">${d}</div></div>`).join('')}`};
 VW.mas=()=>{V.innerHTML=`<div class="card hl"><h1>Más</h1></div>
  <a class="card" href="#pomodoro"><b>🍅 Pomodoro</b><div class="muted">Temporizador de enfoque</div></a>
+ <a class="card" href="#lectura"><b>📖 Lectura</b><div class="muted">Manuales y leyes, textual</div></a><a class="card" href="#cuadros"><b>🗂️ Mis cuadros</b><div class="muted">Aspectos Administrativos</div></a><a class="card" href="#semaforo"><b>🚦 Semáforo por tema</b></a>
  <a class="card" href="#tecnicas"><b>🧠 Técnicas de estudio</b><div class="muted">Cómo funciona la app</div></a>
- <div class="card"><h3>Banco de preguntas</h3><p class="muted">${BANK?`${BANK.items.length} preguntas · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
- <label class="btn">${BANK?'Reemplazar':'Importar'} banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
+ <div class="card"><h3>Banco de preguntas</h3><p class="muted">${BANK?`${BANK.items.length} preguntas activas (${(BANK._all||BANK.items).length-BANK.items.length} ocultas) · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
+ <p class="muted">Lecturas: ${LEC?LEC.temas.length+' temas':'no importadas'} · usa el mismo botón para importar lecturas_privado.json.</p><label class="btn">${BANK?'Reemplazar':'Importar'} banco o lecturas (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
  ${BANK?' <button class="btn sec" id="delb">Quitar banco de este teléfono</button>':''}</div>
  <div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
  <div class="card"><h3>Respaldo de tu avance</h3><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono.</p>
  <div class="row"><button class="btn sec" id="exp">Descargar respaldo</button><label class="btn sec">Restaurar<input type="file" id="impp" accept=".json" hidden></label><button class="btn peligro" id="rst">Borrar avance</button></div></div>
- <p class="muted center">Promoción 2026 · v2.2 · Los datos no salen de tu teléfono.</p>`;
+ <p class="muted center">Promoción 2026 · v2.3 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
  on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);idbDel(KB);BANK=null;render()}});
  on('exp',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()});
  $('#impp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.it)throw 0;localStorage.setItem(KP,JSON.stringify(x));load();tema();toast('Avance restaurado')}catch(_){alert('Archivo no válido')}};r.readAsText(e.target.files[0])};
  on('rst',()=>{if(confirm('¿Borrar todo tu avance?')){localStorage.removeItem(KP);load();tema();toast('Avance borrado');render()}})};
-load();tema();if(P.pomoRun)pomoTick();render();
-if(!BANK&&window.indexedDB)idbGet(KB).then(b=>{if(b&&b.items){BANK=b;tema();render()}}).catch(()=>{});
+load();prep();tema();if(P.pomoRun)pomoTick();render();
+if(!BANK&&window.indexedDB)idbGet(KB).then(b=>{if(b&&b.items){BANK=b;prep();tema();render()}}).catch(()=>{});
+
+/* ---------- v2.3: Mis cuadros, tabla de diferencias, semáforo, Lectura ---------- */
+const famOf=id=>(BANK&&BANK.cuadros||[]).find(f=>f.id===id);
+function difTabla(it){const f=it.fam&&famOf(it.fam);if(!f)return'';return `<div class="card info" style="margin-top:10px"><b>📊 Diferencias · ${esc(f.titulo)}</b> <span class="muted">(${f.cuantos})</span>${f.mnemotecnia?`<div class="muted">🧠 ${esc(f.mnemotecnia)}</div>`:''}<table class="tb">${f.conceptos.map(x=>`<tr${x.concepto===it.a?' class="hi"':''}><td><b>${esc(x.concepto)}</b></td><td>${esc(x.clave)}</td></tr>`).join('')}</table></div>`}
+const semaf=m=>m>=.75?'🟢':m>=.4?'🟡':'🔴';
+VW.cuadros=()=>{const F=BANK.cuadros||[];V.innerHTML=`<div class="card hl"><a href="#inicio" class="muted">‹ Hoy</a><h1>🗂️ Mis cuadros</h1><div class="muted">Estudia por cuadro: fichas → mnemotecnia y diferencias → quiz de ese cuadro.</div></div>`+
+ (F.length?F.map(f=>{const L=BANK.items.filter(i=>i.fam===f.id),m=mastery(L);return `<a class="card" href="#cuadro/${f.id}"><div class="row"><span>${L.length?semaf(m):'⚪'}</span><b class="grow">${esc(f.titulo)}</b><span class="muted">${f.cuantos} · ${Math.round(m*100)}%</span></div><div class="mini">Cap. ${esc(f.cap)}${f.mnemotecnia?' · 🧠 '+esc(f.mnemotecnia):''}</div></a>`}).join(''):'<div class="card">Tu banco no trae cuadros. Importa el banco v9.</div>')};
+VW.cuadro=(id)=>{const f=famOf(id);if(!f)return VW.cuadros();const L=BANK.items.filter(i=>i.fam===f.id);
+ V.innerHTML=`<div class="card hl"><a href="#cuadros" class="muted">‹ Mis cuadros</a><h2>${esc(f.titulo)}</h2><div class="muted">Cap. ${esc(f.cap)} · ¿Cuántos son? <b>${f.cuantos}</b></div>${f.mnemotecnia?`<div class="card info" style="margin-top:8px">🧠 <b>${esc(f.mnemotecnia)}</b></div>`:''}</div>
+ <div class="card"><h3>1 · Fichas</h3><p class="muted">Lee la definición, di el concepto en voz alta y toca para voltear.</p>${f.conceptos.map((x,i)=>`<div class="flip fl2" data-i="${i}"><div class="in"><div class="fc">${hl(esc(x.definicion),[x.clave])}</div><div class="fc back"><b>${esc(x.concepto)}</b><span class="ref">🔑 ${esc(x.clave)} · ${esc(x.fuente.split('), ').pop())}</span></div></div></div>`).join('')}</div>
+ <div class="card"><h3>2 · Diferencias entre hermanos</h3><table class="tb">${f.conceptos.map(x=>`<tr><td><b>${esc(x.concepto)}</b></td><td>${esc(x.clave)}</td></tr>`).join('')}</table></div>
+ <button class="btn xl" id="c-q">3 · Quiz de este cuadro (${L.length})</button><button class="btn xl mint" id="c-c" style="margin-top:10px">🃏 Tarjetas de este cuadro</button>`;
+ V.querySelectorAll('.fl2').forEach(e=>e.onclick=()=>e.classList.toggle('on'));
+ on('c-q',()=>session({title:f.titulo,queue:shuf(L),mode:'leitner'}));on('c-c',()=>session({title:f.titulo+' · tarjetas',queue:shuf(L),mode:'cards'}))};
+VW.semaforo=()=>{V.innerHTML=`<div class="card hl"><a href="#logros" class="muted">‹ Logros</a><h1>🚦 Semáforo por tema</h1><div class="muted">🔴 menos de 40 % · 🟡 40–74 % · 🟢 75 % o más de dominio. ⚪ sin preguntas.</div></div>`+
+ topics().map(t=>`<div class="card"><h3>${esc(t.n)}</h3>${ttList(t.id).map(x=>{const m=mastery(x.L);return `<a class="task" href="#tema/${encodeURIComponent(x.id)}"><span>${x.L.length?semaf(m):'⚪'}</span><span class="grow">${esc(x.n)}</span><b>${x.L.length?Math.round(m*100)+'%':'—'}</b></a>`}).join('')}</div>`).join('')};
+/* Lectura */
+const KWS=()=>{if(KWS.c)return KWS.c;const w=new Set();(BANK&&BANK.cuadros||[]).forEach(f=>f.conceptos.forEach(x=>{w.add(x.clave);if(x.concepto.includes(' ')&&x.concepto.length>12)w.add(x.concepto)}));KWS.c=[...w].filter(x=>x&&x.length>=8&&/\s/.test(x)&&!/[¿?…()]/.test(x)).sort((a,b)=>b.length-a.length);return KWS.c};
+function hl(h,extra){const ks=(extra||[]).concat(KWS()).filter(Boolean);if(!ks.length)return h;const re=new RegExp('(?<![\\wáéíóúñÁÉÍÓÚÑ])('+ks.slice(0,600).map(k=>esc(k).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![\\wáéíóúñÁÉÍÓÚÑ])','gi');return h.replace(re,'<mark>$1</mark>')}
+const lecTemas=()=>LEC?LEC.temas:[];
+const ttName=tt=>{const x=(BANK&&BANK.temario||[]).find(y=>y.id===tt);return x?x.tema:null};
+function lecPct(L){return L.length?Math.round(L.filter(x=>P.read&&P.read[x.id]).length*100/L.length):0}
+function nextRead(){const L=lecTemas();if(!L.length)return null;if(P.lastRead&&!P.read?.[P.lastRead.id]){const x=L.find(y=>y.id===P.lastRead.id);if(x)return x}
+ return L.find(x=>x.tt&&!(P.read||{})[x.id])||L.find(x=>!(P.read||{})[x.id])}
+VW.lectura=(q)=>{P.read=P.read||{};const L=lecTemas();
+ if(!L.length){V.innerHTML=`<div class="card hl"><h1>📖 Lectura</h1><p class="muted">Importa <b>lecturas_privado.json</b> (texto literal de manuales y leyes). Se guarda solo en este teléfono.</p><label class="btn xl">Importar lecturas (.json)<input type="file" id="imp" accept=".json" hidden></label></div>`;$('#imp').onchange=importBank;return}
+ const qq=q?norm(q):'';const nr=nextRead();
+ const grp={};L.forEach(x=>{if(qq&&!norm(x.titulo+' '+x.doc+' '+x.parrafos.map(p=>p.txt).join(' ')).includes(qq))return;const k=x.t;(grp[k]=grp[k]||{});const g=x.tt?(ttName(x.tt)||x.doc):x.doc;(grp[k][g]=grp[k][g]||[]).push(x)});
+ V.innerHTML=`<div class="card hl"><h1>📖 Lectura</h1><div class="muted">Texto literal de tus manuales y leyes. Lee antes de practicar: ${lecPct(L)} % leído en total.</div>
+ <input type="search" id="lq" placeholder="Buscar en las lecturas…" value="${esc(q||'')}" style="margin-top:10px">${nr?`<a class="btn xl" href="#leer/${nr.id}" style="margin-top:10px">▶ ${P.lastRead&&P.lastRead.id===nr.id?'Retomar':'Seguir con'}: ${esc(nr.titulo.slice(0,60))}</a>`:''}</div>`+
+ topics().filter(t=>grp[t.id]).map(t=>{const all=L.filter(x=>x.t===t.id);return `<details class="card" ${qq?'open':''}><summary><b>${esc(t.n)}</b> <span class="muted">${lecPct(all)} % leído</span></summary>${Object.entries(grp[t.id]).map(([g,X])=>`<div style="margin-top:10px"><b>${esc(g)}</b> <span class="muted">${lecPct(X)} %</span>${barra(lecPct(X)/100,COL[t.id])}${X.map(x=>`<a class="task" href="#leer/${x.id}"><span>${P.read[x.id]?'✅':'⬜'}</span><span class="grow">${esc(x.titulo)}</span><span class="mini">${Math.max(1,Math.round(x.chars/1200))} min</span></a>`).join('')}</div>`).join('')}</details>`}).join('');
+ $('#lq').onchange=e=>location.hash='#lectura/'+encodeURIComponent(e.target.value)};
+function lecItems(x){if(x.tt){const L=byTT(x.tt);if(L.length)return L}
+ const txt=norm(x.parrafos.map(p=>p.txt).join(' '));return BANK.items.filter(i=>i.t===x.t&&String(i.a).length>3&&txt.includes(norm(i.a))).slice(0,40)}
+VW.leer=(id)=>{P.read=P.read||{};P.fs=P.fs||1;const L=lecTemas(),x=L.find(y=>y.id===id);if(!x)return VW.lectura();const k=L.indexOf(x),nx=L[k+1];
+ P.lastRead={id,y:(P.lastRead&&P.lastRead.id===id)?P.lastRead.y:0};save();const Q=lecItems(x);
+ V.innerHTML=`<div class="card hl"><a href="#lectura" class="muted">‹ Lectura</a><h2>${esc(x.titulo)}</h2><div class="muted">${esc(x.fuente)}${x.tt?' · Tema: '+esc(ttName(x.tt)||x.tt):''}</div>
+ <div class="row" style="margin-top:8px"><button class="btn sm sec" id="fm">A−</button><button class="btn sm sec" id="fp">A+</button><span class="muted">🟨 palabra clave</span></div></div>
+ <div class="card lec" style="font-size:${P.fs}rem">${x.parrafos.map(p=>`<p>${p.ref?`<span class="tag">${esc(p.ref)}</span> `:''}${hl(esc(p.txt))}</p>`).join('')}</div>
+ <label class="card row"><input type="checkbox" id="rd" ${P.read[id]?'checked':''} style="width:auto"> <b>Ya lo leí</b></label>
+ <button class="btn xl" id="pr">🎯 Practicar este tema (${Q.length})</button>${nx?`<a class="btn xl sec" href="#leer/${nx.id}" style="margin-top:10px">Siguiente lectura ›</a>`:''}`;
+ setTimeout(()=>scrollTo(0,P.lastRead.y||0),30);
+ window.onscroll=()=>{if(location.hash==='#leer/'+id){P.lastRead.y=scrollY;clearTimeout(VW._t);VW._t=setTimeout(save,400)}};
+ const fs=d=>{P.fs=Math.min(1.8,Math.max(.8,P.fs+d));save();$('.lec').style.fontSize=P.fs+'rem'};on('fm',()=>fs(-.1));on('fp',()=>fs(.1));
+ $('#rd').onchange=e=>{if(e.target.checked){P.read[id]=Date.now();gainXP(5)}else delete P.read[id];save()};
+ on('pr',()=>{P.read[id]=P.read[id]||Date.now();save();if(!Q.length)return toast('Este tema aún no tiene preguntas');const cards=shuf(Q).slice(0,8);
+  session({title:x.titulo.slice(0,40)+' · fichas',queue:cards,mode:'cards',onEnd:()=>{S.msg='Ahora el quiz del tema 👇';setTimeout(()=>session({title:x.titulo.slice(0,40)+' · quiz',queue:shuf(Q).slice(0,15),mode:'leitner'}),1800)}})})};
+if(window.indexedDB)idbGet(KL).then(b=>{if(b&&b.temas){LEC=b;if(/inicio|lectura|leer/.test(location.hash||'#inicio'))render()}}).catch(()=>{});
