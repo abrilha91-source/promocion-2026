@@ -1,30 +1,48 @@
 'use strict';
-/* Promoción 2026 · App de estudio. El banco de preguntas NO viene incluido: se importa en el dispositivo y vive solo en localStorage. */
+/* Promoción 2026 · v2.0 · App de estudio (estilo Plan de Ascenso). El banco de preguntas NO viene incluido: se importa en el dispositivo y vive solo en localStorage. */
 const $=s=>document.querySelector(s),V=$('#v');
 const KB='p26_bank',KP='p26_prog',DAY=864e5,INT=[0,0,1,3,7,15];
-let BANK=null,P=null,TIMER=null;
+let BANK=null,P=null,TIMER=null,POMO=null;
 const RANKS=['Cadete','Subteniente','Teniente','Cap. 2/o.','Cap. 1/o.','Mayor','Tte. Cor.','Coronel','Gral. Brig.','Gral. Brigada','Gral. Div.'];
 const STOP=new Set('el la los las un una unos unas de del al a en y o u que se su sus por para con sin es son lo le les como más mas este esta estos estas ese esa cual cuál cuando donde dónde qué quien quién ha han ser será sean está están entre sobre todo toda todos todas otro otra otros otras dicha dichas dicho cada mismo misma muy tanto'.split(' '));
+const COL={LM:'#5b4bf5',OP:'#ff7a5c',DH:'#22c39a',AA:'#f0a224',AMM:'#3fb6f0',AT:'#e0405a'};
 function load(){try{BANK=JSON.parse(localStorage.getItem(KB))}catch(e){BANK=null}
  try{P=JSON.parse(localStorage.getItem(KP))}catch(e){P=null}
- P=Object.assign({it:{},xp:0,st:{n:0,last:''},day:{d:'',n:0},goal:20,hist:[],lv:{},best:{}},P||{})}
+ P=Object.assign({it:{},xp:0,st:{n:0,last:''},day:{d:'',n:0},goal:20,hist:[],lv:{},best:{},
+  hd:{},xpd:{},badges:{},retos:{},logs:[],pomo:{work:25,short:5,long:15,every:4,count:0},pomoRun:null,dark:false,cnt:{resp:0,ok:0,maxc:0,cards:0,sim:0,pomos:0}},P||{});
+ if(!P.cnt.resp){let r=0,o=0;Object.values(P.it).forEach(s=>{r+=(s.ok||0)+(s.ko||0);o+=s.ok||0});P.cnt.resp=r;P.cnt.ok=o}}
 function save(){localStorage.setItem(KP,JSON.stringify(P))}
 const today=()=>new Date().toLocaleDateString('sv');
+const ymd=d=>d.toLocaleDateString('sv');
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ').trim();
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const cap=s=>{s=s.toLowerCase();return s.charAt(0).toUpperCase()+s.slice(1)};
-function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1800)}
+const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ').trim();
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cap=s=>{s=String(s).toLowerCase();return s.charAt(0).toUpperCase()+s.slice(1)};
+const pct=(a,b)=>b?Math.round(a*100/b):0;
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
 const topics=()=>BANK?BANK.temas.filter(t=>BANK.items.some(i=>i.t===t.id)):[];
 const items=t=>BANK.items.filter(i=>!t||i.t===t);
+const byTT=tt=>BANK.items.filter(i=>(i.tt||('s:'+i.s))===tt);
 const st=id=>P.it[id]||{b:0,due:0,ok:0,ko:0};
-function rankOf(xp){const l=Math.floor(Math.sqrt(xp/60));return{l,name:RANKS[Math.min(l,RANKS.length-1)],next:Math.pow(l+1,2)*60,prev:l*l*60}}
+function rankOf(xp){const l=Math.floor(Math.sqrt(xp/60));return{l,name:RANKS[Math.min(l,RANKS.length-1)],nextName:RANKS[Math.min(l+1,RANKS.length-1)],next:Math.pow(l+1,2)*60,prev:l*l*60}}
+const HD=()=>(P.hd[today()]=P.hd[today()]||{resp:0,ok:0,cards:0,ses:0,min:0});
+function racha(){let d=new Date();const a=x=>P.hd[ymd(x)]&&(P.hd[ymd(x)].resp||P.hd[ymd(x)].min);if(!a(d))d=new Date(Date.now()-DAY);let n=0;while(a(d)){n++;d=new Date(d.getTime()-DAY)}return Math.max(n,P.st.last===today()?P.st.n:0)}
 function bump(){const d=today();if(P.day.d!==d){P.day={d,n:0}}P.day.n++;
  if(P.st.last!==d){const y=new Date(Date.now()-DAY).toLocaleDateString('sv');P.st.n=(P.st.last===y?P.st.n:0)+1;P.st.last=d}}
+function gainXP(n){if(!n)return;const r0=rankOf(P.xp).l,h0=P.xpd[today()]||0;P.xp+=n;P.xpd[today()]=h0+n;
+ if(rankOf(P.xp).l>r0)setTimeout(()=>{confeti();toast('🎖️ ¡Ascenso a '+rankOf(P.xp).name+'!')},300);
+ const meta=P.goal*10;if(h0<meta&&h0+n>=meta){setTimeout(()=>{confeti(80);toast('🎯 ¡Meta diaria cumplida!')},200)}
+ checkBadges();hdr()}
+/* Repetición espaciada: Leitner (quiz) + SM-2 (tarjetas con autoevaluación) sobre el mismo registro */
 function grade(it,ok){const s=Object.assign({b:0,due:0,ok:0,ko:0},P.it[it.id]);
  if(ok){s.ok++;s.b=Math.min(5,s.b+1)}else{s.ko++;s.b=1}
- s.due=Date.now()+INT[s.b]*DAY-36e5;s.last=Date.now();P.it[it.id]=s;bump();save()}
-function mastery(t){const L=items(t);if(!L.length)return 0;return L.reduce((a,i)=>a+Math.min(st(i.id).b,4),0)/(L.length*4)}
+ s.due=Date.now()+INT[s.b]*DAY-36e5;s.last=Date.now();P.it[it.id]=s;bump();count(ok);save()}
+function sm2(it,q){const s=Object.assign({b:0,due:0,ok:0,ko:0},P.it[it.id]);s.ef=s.ef||2.5;s.rep=s.rep||0;s.iv=s.iv||0;
+ if(q<3){s.rep=0;s.iv=1;s.ko++;s.b=1}else{s.rep++;s.iv=s.rep===1?1:s.rep===2?6:Math.round(s.iv*s.ef);s.ok++;s.b=Math.min(5,s.b+1)}
+ s.ef=Math.max(1.3,s.ef+(0.1-(5-q)*(0.08+(5-q)*0.02)));
+ s.due=Date.now()+(q<3?10*60000:s.iv*DAY-36e5);s.last=Date.now();P.it[it.id]=s;bump();count(q>=3);HD().cards++;P.cnt.cards++;save()}
+function count(ok){const h=HD();h.resp++;P.cnt.resp++;if(ok){h.ok++;P.cnt.ok++}}
+function mastery(L){if(!L.length)return 0;return L.reduce((a,i)=>a+Math.min(st(i.id).b,4),0)/(L.length*4)}
 
 /* ---------- Generadores de reactivos ---------- */
 function distract(it,n=3){const a=norm(it.a),out=[],used=new Set([a]);
@@ -35,147 +53,275 @@ function mkMC(it){let d=(it.d||[]).filter(x=>norm(x)!==norm(it.a)).slice(0,3);if
 function mkTF(it){const t=Math.random()<.5,cand=t?it.a:(distract(it,1)[0]||it.a);return{k:'tf',it,q:it.q,cand,opts:['Verdadero','Falso'],ans:(t||cand===it.a)?'Verdadero':'Falso',lbl:'Verdadero o falso'}}
 function mkFill(it){const w=it.q.split(/\s+/),c=[];w.forEach((x,i)=>{const n=norm(x);if(n.length>=6&&!STOP.has(n)&&!/\d/.test(n))c.push(i)});
  if(!c.length)return mkMC(it);const i=c[Math.random()*c.length|0],raw=w[i],word=raw.replace(/^[^\wÁÉÍÓÚÑáéíóúñü]+|[^\wÁÉÍÓÚÑáéíóúñü]+$/g,'');
- const pool=new Set();shuf(BANK.items.filter(x=>x.t===it.t&&x.id!==it.id)).forEach(x=>x.q.split(/\s+/).forEach(y=>{y=y.replace(/^[^\wÁÉÍÓÚÑáéíóúñü]+|[^\wÁÉÍÓÚÑáéíóúñü]+$/g,'');const n=norm(y);if(n.length>=6&&!STOP.has(n)&&norm(word)!==n&&Math.abs(n.length-word.length)<4)pool.add(y.toLowerCase())}));
+ const pool=new Set();shuf(BANK.items.filter(x=>x.t===it.t&&x.id!==it.id)).slice(0,400).forEach(x=>x.q.split(/\s+/).forEach(y=>{y=y.replace(/^[^\wÁÉÍÓÚÑáéíóúñü]+|[^\wÁÉÍÓÚÑáéíóúñü]+$/g,'');const n=norm(y);if(n.length>=6&&!STOP.has(n)&&norm(word)!==n&&Math.abs(n.length-word.length)<4)pool.add(y.toLowerCase())}));
  const d=shuf([...pool]).slice(0,3);if(d.length<3)return mkMC(it);
  const q=w.map((x,j)=>j===i?x.replace(word,'_____'):x).join(' ');
  return{k:'fill',it,q,extra:'Respuesta: '+it.a,opts:shuf([word.toLowerCase(),...d]),ans:word.toLowerCase(),lbl:'Completa la palabra exacta'}}
 function mkOrder(it){const w=it.a.split(/\s+/);if(w.length<3||w.length>9)return mkFill(it);return{k:'order',it,q:it.q,words:w,ans:it.a,lbl:'Ordena la respuesta'}}
 function mkWrite(it){return{k:'write',it,q:it.q,ans:it.a,lbl:'Escríbela de memoria'}}
+function mkCard(it){return{k:'card',it,q:it.q,ans:it.a,lbl:'Recuerdo activo · tarjeta'}}
 function kindFor(it,mode){const b=st(it.id).b,r=Math.random();
  if(mode==='exam')return mkMC(it);
+ if(mode==='cards')return mkCard(it);
  if(mode==='fast')return r<.6?mkMC(it):mkTF(it);
  if(mode==='mix')return r<.45?mkMC(it):r<.7?mkTF(it):mkFill(it);
+ if(mode==='boss')return r<.35?mkMC(it):r<.6?mkFill(it):r<.8?mkOrder(it):mkWrite(it);
  if(b<=1)return r<.75?mkMC(it):mkTF(it);
- if(b===2)return r<.4?mkFill(it):r<.7?mkMC(it):mkTF(it);
- if(b===3)return r<.5?mkOrder(it):mkFill(it);
- return r<.6?mkWrite(it):mkOrder(it)}
+ if(b===2)return r<.4?mkFill(it):r<.7?mkMC(it):mkCard(it);
+ if(b===3)return r<.4?mkOrder(it):r<.7?mkFill(it):mkCard(it);
+ return r<.45?mkWrite(it):r<.75?mkCard(it):mkOrder(it)}
 function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
 function writeOK(u,a){u=norm(u).replace(/^(el|la|los|las|lo) /,'');a=norm(a).replace(/^(el|la|los|las|lo) /,'');if(!u)return false;
  return 1-lev(u,a)/Math.max(a.length,1)>=.8}
+/* Intercalado: alterna materias para que no salgan dos seguidas de la misma */
+function interleave(L){const g={};L.forEach(i=>(g[i.t]=g[i.t]||[]).push(i));const ks=shuf(Object.keys(g));const out=[];let k=0;
+ while(out.length<L.length){const key=ks[k%ks.length];if(g[key].length)out.push(g[key].shift());k++;if(k>L.length*ks.length+10)break}return out}
 
 /* ---------- Motor de sesiones ---------- */
 let S=null;
-function session(o){clearInterval(TIMER);S=Object.assign({i:0,ok:0,ko:0,combo:0,maxc:0,xp:0,log:[],lives:null,left:null,done:false},o);
- S.queue=S.queue.slice();setChrome(true,o.title);if(S.total){S.left=S.total;TIMER=setInterval(tick,1000)}next()}
+function session(o){clearInterval(TIMER);S=Object.assign({i:0,ok:0,ko:0,combo:0,maxc:0,xp:0,log:[],lives:null,left:null,done:false,t0:Date.now()},o);
+ S.queue=S.queue.slice();if(!S.queue.length&&!S.endless){toast('No hay preguntas para esta sesión');return}
+ setChrome(true,o.title);if(S.total){S.left=S.total;TIMER=setInterval(tick,1000)}next()}
 function tick(){S.left--;const e=$('#clk');if(e)e.textContent=fmt(S.left);if(S.left<=0){clearInterval(TIMER);finish()}}
 const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 function next(){if(S.done)return;
  if(S.lives!==null&&S.lives<=0)return finish();
  if(S.i>=S.queue.length){if(S.endless){S.queue=S.queue.concat(shuf(S.pool()));}else return finish()}
- const it=S.queue[S.i];S.cur=kindFor(it,S.mode);render()}
-function hud(){const p=S.endless?'':`${S.i+1}/${S.queue.length}`;
- return `<div class="hud"><span>${p} ${S.lives!==null?'❤️'.repeat(Math.max(S.lives,0)):''}</span><span>${S.combo>1?'🔥x'+S.combo:''}</span><span>${S.left!==null?'⏱ <b id="clk">'+fmt(S.left)+'</b>':''} ✔ ${S.ok}</span></div>`}
-function render(){const c=S.cur,it=c.it;let h=hud()+`<div class="card"><span class="chip">${esc(c.lbl)}</span><span class="chip">${esc(it.s)}</span><div class="q">${esc(c.q)}</div>`;
- if(c.k==='tf')h+=`<div class="card" style="background:#faf8f2"><b>${esc(c.cand)}</b></div>`;
+ const it=S.queue[S.i];S.cur=kindFor(it,S.mode);draw()}
+function hud(){const p=S.endless?'':`${S.i+1}/${S.queue.length}`;const w=S.endless?0:pct(S.i,S.queue.length);
+ return `${S.endless?'':`<div class="pbar"><i style="width:${w}%"></i></div>`}<div class="hud"><span>${p} ${S.lives!==null?'❤️'.repeat(Math.max(S.lives,0)):''}</span><span>${S.combo>1?'🔥 combo x'+S.combo:''}</span><span>${S.left!==null?'⏱ <b id="clk">'+fmt(S.left)+'</b> · ':''}✔ ${S.ok}</span></div>`}
+function fuenteH(it){return it.fuente?`<span class="fuente">📖 Fuente: ${esc(it.fuente)}</span>`:''}
+function draw(){const c=S.cur,it=c.it;const col=COL[it.t]||'var(--pri)';
+ let h=hud()+`<div class="card"><span class="tag">${esc(c.lbl)}</span> <span class="tag" style="background:${col}22;color:${col}">${esc(it.s||it.t)}</span><div class="q">${esc(c.q)}</div>`;
+ if(c.k==='tf')h+=`<div class="card info"><b>${esc(c.cand)}</b></div>`;
  if(c.k==='fill')h+=`<div class="muted">${esc(c.extra)}</div>`;
- if(c.k==='mc'||c.k==='tf'||c.k==='fill')h+=c.opts.map((o,i)=>`<button class="opt" data-i="${i}">${esc(c.k==='mc'?cap(o):o)}</button>`).join('');
+ if(c.k==='mc'||c.k==='tf'||c.k==='fill')h+=c.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="lt">${'ABCD'[i]}</span><span>${esc(c.k==='mc'?cap(o):o)}</span></button>`).join('');
  if(c.k==='order'){c.pick=[];c.pool=shuf(c.words.map((w,i)=>({w,i})));h+=`<div class="words" id="dst"></div><div class="words" id="src" style="border-style:solid"></div><button class="btn" id="chk">Revisar</button>`}
- if(c.k==='write')h+=`<input type="text" id="wr" autocomplete="off" placeholder="Escribe la respuesta exacta"><button class="btn" id="chk">Revisar</button><button class="btn alt" id="idk">No me acuerdo</button>`;
+ if(c.k==='write')h+=`<input type="text" id="wr" autocomplete="off" placeholder="Escribe la respuesta exacta"><div class="row" style="margin-top:8px"><button class="btn" id="chk">Revisar</button><button class="btn sec" id="idk">No me acuerdo</button></div>`;
+ if(c.k==='card')h+=`<p class="muted">Responde en voz alta o mentalmente <b>antes</b> de voltear (recuerdo activo).</p><div class="flip" id="fl"><div class="in"><div class="fc">${esc(c.q)}</div><div class="fc back">${esc(it.a)}${it.fuente?`<span class="ref">📖 ${esc(it.fuente)}</span>`:''}</div></div></div>
+ <button class="btn xl" id="show" style="margin-top:12px">Mostrar respuesta</button><div id="rt" class="hide"><p class="muted center" style="margin:10px 0 0">¿Qué tan bien la recordaste?</p><div class="rate">
+ <button class="btn peligro" data-q="1">Otra vez<small>10 min</small></button><button class="btn coral" data-q="3">Difícil<small>${prevIv(it,3)}</small></button><button class="btn" data-q="4">Bien<small>${prevIv(it,4)}</small></button><button class="btn mint" data-q="5">Fácil<small>${prevIv(it,5)}</small></button></div></div>`;
  h+=`<div id="fb"></div></div>`;V.innerHTML=h;
  if(c.k==='order')drawOrder();
+ if(c.k==='card'){const flip=()=>{$('#fl').classList.add('on');$('#show').classList.add('hide');$('#rt').classList.remove('hide')};$('#fl').onclick=flip;$('#show').onclick=flip;
+  V.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>rateCard(+b.dataset.q))}
  V.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(c.opts[b.dataset.i],b));
  const k=$('#chk');if(k)k.onclick=()=>answer(c.k==='order'?c.pick.map(x=>x.w).join(' '):$('#wr').value);
  const idk=$('#idk');if(idk)idk.onclick=()=>answer('');
  const wr=$('#wr');if(wr){wr.focus();wr.onkeydown=e=>{if(e.key==='Enter')answer(wr.value)}}}
+function prevIv(it,q){const s=Object.assign({ef:2.5,rep:0,iv:0},P.it[it.id]);const rep=s.rep+1;const iv=rep===1?1:rep===2?6:Math.round((s.iv||1)*(s.ef||2.5));return iv+' d'}
+function rateCard(q){const c=S.cur;if(c.answered)return;c.answered=true;const ok=q>=3;
+ S.log.push({it:c.it,ok,k:'card'});if(ok){S.ok++;S.combo++;S.maxc=Math.max(S.maxc,S.combo)}else{S.ko++;S.combo=0;if(S.lives!==null)S.lives--}
+ if(!S.noGrade)sm2(c.it,q);const g=ok?5+Math.min(S.combo,5):2;S.xp+=g;gainXP(g);S.i++;next()}
 function drawOrder(){const c=S.cur;$('#dst').innerHTML=c.pick.map((x,j)=>`<button class="w" data-j="${j}">${esc(x.w)}</button>`).join('');
  $('#src').innerHTML=c.pool.map((x,j)=>`<button class="w pool" data-j="${j}">${esc(x.w)}</button>`).join('');
  $('#dst').querySelectorAll('button').forEach(b=>b.onclick=()=>{c.pool.push(c.pick.splice(b.dataset.j,1)[0]);drawOrder()});
  $('#src').querySelectorAll('button').forEach(b=>b.onclick=()=>{c.pick.push(c.pool.splice(b.dataset.j,1)[0]);drawOrder()})}
+const OKS=['¡Exacto!','¡Eso es!','¡Literal, perfecto!','¡Muy bien, Capitán!','¡Así se asciende!'];
 function answer(v,btn){const c=S.cur;if(c.answered)return;c.answered=true;
  let ok=c.k==='write'?writeOK(v,c.ans):c.k==='order'?norm(v)===norm(c.ans):v===c.ans;
- S.log.push({it:c.it,ok,given:v,k:c.k});
- if(ok){S.ok++;S.combo++;S.maxc=Math.max(S.maxc,S.combo);const g=10+Math.min(S.combo,10)*(S.mode==='fast'?2:1);S.xp+=g}else{S.ko++;S.combo=0;if(S.lives!==null)S.lives--}
- if(!S.noGrade)grade(c.it,ok);
+ S.log.push({it:c.it,ok,given:v,k:c.k});let g;
+ if(ok){S.ok++;S.combo++;S.maxc=Math.max(S.maxc,S.combo);g=10+Math.min(S.combo,10)*(S.mode==='fast'?2:1)}else{S.ko++;S.combo=0;g=2;if(S.lives!==null)S.lives--}
+ S.xp+=g;P.cnt.maxc=Math.max(P.cnt.maxc||0,S.maxc);
+ if(!S.noGrade)grade(c.it,ok);else{count(ok);save()}
+ gainXP(g);checkReto();
  if(S.silent){S.i++;return next()}
- V.querySelectorAll('.opt').forEach(b=>{const o=c.opts[b.dataset.i];if(o===c.ans)b.classList.add('ok');else if(b===btn)b.classList.add('no');b.disabled=true});
- const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}">${ok?'✔ ¡Exacto!':'✘ Literal del manual:'}<br><b>${esc(c.it.a)}</b>${c.it.fuente?'<br><span class="muted" style="font-size:.85em">📖 Fuente: '+esc(c.it.fuente)+'</span>':''}${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}</div><button class="btn" id="nx">Siguiente ›</button>`;
+ V.querySelectorAll('.opt').forEach(b=>{const o=c.opts[b.dataset.i];if(o===c.ans)b.classList.add('ok');else if(b===btn)b.classList.add('bad');b.disabled=true});
+ const f=$('#fb');f.innerHTML=`<div class="fb ${ok?'ok pop':'no'}"><b>${ok?'✔ '+OKS[Math.random()*OKS.length|0]:'✘ Literal del manual:'}</b><br>${esc(c.it.a)}${fuenteH(c.it)}${c.k==='write'&&!ok&&v?'<br><span class="muted">Escribiste: '+esc(v)+'</span>':''}</div><button class="btn xl" id="nx" style="margin-top:10px">Siguiente ›</button>`;
  const go=()=>{S.i++;next()};$('#nx').onclick=go;
  if(ok&&S.auto)setTimeout(()=>{if(S.cur===c)go()},650)}
-function finish(){if(S.done)return;S.done=true;clearInterval(TIMER);const n=S.ok+S.ko,pct=n?Math.round(S.ok*100/n):0;
- P.xp+=S.xp;P.hist.push({d:Date.now(),m:S.title,ok:S.ok,n});P.hist=P.hist.slice(-200);
+function finish(){if(S.done)return;S.done=true;clearInterval(TIMER);const n=S.ok+S.ko,p=n?Math.round(S.ok*100/n):0;
+ P.hist.push({d:Date.now(),m:S.title,ok:S.ok,n});P.hist=P.hist.slice(-200);HD().ses++;
+ if(S.title==='Simulacro')P.cnt.sim++;
+ const min=Math.round((Date.now()-S.t0)/60000);if(min>=1)HD().min+=min;
  if(S.bestKey&&S.ok>(P.best[S.bestKey]||0)){P.best[S.bestKey]=S.ok;S.rec=true}
- if(S.onEnd)S.onEnd(pct);save();
+ if(S.onEnd)S.onEnd(p);gainXP(n>=5?15:0);checkReto();save();if(p>=80&&n>=5)confeti();
  const errs=S.log.filter(x=>!x.ok);
- V.innerHTML=`<div class="card center"><div class="big">${pct>=80?'🏅':pct>=60?'👍':'💪'}</div><h2>${S.ok} de ${n} (${pct}%)</h2>
- <p class="muted">+${S.xp} XP · racha máxima ${S.maxc}${S.rec?' · ¡nuevo récord!':''}</p>${S.msg?'<p><b>'+S.msg+'</b></p>':''}</div>
- ${errs.length?`<div class="card"><h3>Repasa estos (literal)</h3>${errs.map(x=>`<p><span class="muted">${esc(x.it.q)}</span><br><b>${esc(x.it.a)}</b></p>`).join('')}</div>`:''}
- <button class="btn" id="fin">Volver al inicio</button>`;$('#fin').onclick=()=>go('home')}
+ V.innerHTML=`<div class="card hero center"><div class="big">${p>=80?'🏅':p>=60?'👍':'💪'}</div><h1>${S.ok} de ${n} (${p}%)</h1>
+ <p class="muted">+${S.xp+(n>=5?15:0)} XP · combo máximo ${S.maxc}${S.rec?' · ¡nuevo récord!':''} · ${min} min</p>${S.msg?'<p><b>'+esc(S.msg)+'</b></p>':''}</div>
+ ${errs.length?`<div class="card"><h3>Repasa estos (literal)</h3>${errs.map(x=>`<p><span class="muted">${esc(x.it.q)}</span><br><b>${esc(x.it.a)}</b>${fuenteH(x.it)}</p>`).join('')}<p class="muted">Ya quedaron en tu cuaderno de errores y volverán por repetición espaciada.</p></div>`:''}
+ <button class="btn xl" id="fin">Volver a Hoy</button>`;$('#fin').onclick=()=>{setChrome(false);location.hash='#inicio';render()}}
 
 /* ---------- Pools ---------- */
 function duePool(t){const now=Date.now();return items(t).filter(i=>{const s=P.it[i.id];return s&&s.due<=now})}
 function newPool(t){return items(t).filter(i=>!P.it[i.id])}
-function daily(t,n){const d=shuf(duePool(t)).sort((a,b)=>st(a.id).b-st(b.id).b);let q=d.slice(0,n);if(q.length<n)q=q.concat(newPool(t).slice(0,n-q.length));
- if(q.length<n)q=q.concat(shuf(items(t)).filter(i=>!q.includes(i)).slice(0,n-q.length));return shuf(q)}
+function daily(t,n){const d=shuf(duePool(t)).sort((a,b)=>st(a.id).b-st(b.id).b);let q=d.slice(0,n);if(q.length<n)q=q.concat(shuf(newPool(t)).slice(0,n-q.length));
+ if(q.length<n)q=q.concat(shuf(items(t)).filter(i=>!q.includes(i)).slice(0,n-q.length));return interleave(q)}
 function errPool(){return BANK.items.filter(i=>{const s=P.it[i.id];return s&&s.ko>0&&s.b<=2})}
+/* Sesión guiada: repaso vencido (60 %) + errores (20 %) + nuevas (20 %), intercaladas */
+function guided(n){const used=new Set(),take=(L,k)=>{const o=[];for(const i of L){if(o.length>=k)break;if(!used.has(i.id)){used.add(i.id);o.push(i)}}return o};
+ const due=take(shuf(duePool()).sort((a,b)=>st(a.id).b-st(b.id).b),Math.ceil(n*.6));const er=take(shuf(errPool()),Math.ceil(n*.2));
+ let q=due.concat(er);q=q.concat(take(shuf(newPool()),n-q.length));if(q.length<n)q=q.concat(take(shuf(BANK.items),n-q.length));return interleave(q)}
 
-/* ---------- Vistas ---------- */
-function setChrome(inS,t){$('#back').classList.toggle('hidden',!inS);$('#nav').classList.toggle('hidden',inS);$('#ttl').textContent=t||'Promoción 2026'}
-$('#back').onclick=()=>{if(S&&!S.done&&confirm('¿Salir de la sesión? Lo respondido sí se guarda.')){S.done=true;clearInterval(TIMER);go('home')}else if(!S||S.done)go('home')};
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.r));
-function go(r,a){clearInterval(TIMER);setChrome(false);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.r===r));
- if(!BANK&&r!=='ajustes')return noBank();({home,temas,errores,ajustes,tema,simulacro})[r](a);scrollTo(0,0)}
-function noBank(){V.innerHTML=`<div class="card center"><div class="big">🔒</div><h2>Importa tu banco privado</h2>
-<p>Esta app se publica <b>vacía</b>. Para estudiar, importa el archivo <b>banco_privado.json</b> que te entregaron por chat. Se guarda solo en este teléfono.</p>
-<label class="btn gold center">Importar banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label></div>`;$('#imp').onchange=importBank}
+/* ---------- Logros / retos ---------- */
+const BADGES=[
+ ['primera','🪖','Primera respuesta','Responde tu primera pregunta',()=>P.cnt.resp>=1],
+ ['ok100','🎯','Cien aciertos','100 respuestas correctas',()=>P.cnt.ok>=100],
+ ['ok500','🏹','Francotiradora','500 respuestas correctas',()=>P.cnt.ok>=500],
+ ['ok2000','🦅','Élite','2,000 respuestas correctas',()=>P.cnt.ok>=2000],
+ ['run5','⚡','En racha','Combo de 5 aciertos',()=>P.cnt.maxc>=5],
+ ['run15','🔥','Imparable','Combo de 15 aciertos',()=>P.cnt.maxc>=15],
+ ['dias3','📆','Arranque','3 días seguidos',()=>racha()>=3],
+ ['dias7','📅','Constancia','7 días seguidos',()=>racha()>=7],
+ ['dias30','🗓️','Disciplina militar','30 días seguidos',()=>racha()>=30],
+ ['cards50','🃏','Memoria activa','50 tarjetas autoevaluadas',()=>P.cnt.cards>=50],
+ ['pomo1','🍅','Primer pomodoro','Completa un pomodoro',()=>P.cnt.pomos>=1],
+ ['pomo20','⏱️','Enfoque total','20 pomodoros',()=>P.cnt.pomos>=20],
+ ['sim1','📝','Simulacro','Termina un simulacro',()=>P.cnt.sim>=1],
+ ['dom','🏆','Dominio','Una materia al 80 %',()=>BANK&&topics().some(t=>mastery(items(t.id))>=.8)],
+];
+function checkBadges(){BADGES.forEach(([k,ic,n,,f])=>{if(!P.badges[k]){let ok=false;try{ok=f()}catch(e){}if(ok){P.badges[k]=today();setTimeout(()=>{toast(ic+' Insignia: '+n);confeti(60)},700)}}})}
+const RETOS=[['🚀','Completa la sesión guiada de hoy','ses',1],['🔥','Logra 15 aciertos hoy','ok',15],['🎯','Responde 30 preguntas','resp',30],['🃏','Autoevalúa 10 tarjetas','cards',10],['⏱️','Estudia 25 minutos (un pomodoro)','min',25],['✅','Acierta 25 preguntas','ok',25]];
+const reto=()=>RETOS[Math.floor(Date.parse(today())/DAY)%RETOS.length];
+const retoP=()=>{const r=reto();return Math.min(1,(HD()[r[2]]||0)/r[3])};
+function checkReto(){if(P.retos[today()]||retoP()<1)return;P.retos[today()]=1;setTimeout(()=>{toast(reto()[0]+' ¡Reto del día cumplido! +25 XP');confeti(90)},400);gainXP(25)}
+
+/* ---------- Efectos ---------- */
+function confeti(n=120){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;let cv=document.getElementById('confetti');if(!cv){cv=document.createElement('canvas');cv.id='confetti';cv.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:90';document.body.appendChild(cv)}
+ const W=cv.width=innerWidth,H=cv.height=innerHeight,ctx=cv.getContext('2d');const cols=['#5b4bf5','#8b5cf6','#ff7a5c','#22c39a','#ffc83d','#3fb6f0'];const Pp=[];
+ for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=3+Math.random()*7;Pp.push({x:W/2,y:H*.35,vx:Math.cos(a)*v,vy:Math.sin(a)*v-4,r:3+Math.random()*4,c:cols[i%cols.length],l:0})}
+ cv._P=(cv._P||[]).concat(Pp);if(cv._run)return;cv._run=true;
+ (function f(){ctx.clearRect(0,0,W,H);cv._P=cv._P.filter(p=>p.l<110&&p.y<H+20);cv._P.forEach(p=>{p.l++;p.vy+=.22;p.x+=p.vx;p.y+=p.vy;ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,p.r,p.r*1.6)});if(cv._P.length)requestAnimationFrame(f);else{cv._run=false;ctx.clearRect(0,0,W,H)}})()}
+function ring(p,s=72,c='var(--pri)'){const r=s/2-7,C=2*Math.PI*r;p=Math.max(0,Math.min(1,p));return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${s/2}" cy="${s/2}" r="${r}" fill="none" stroke="var(--verde-cl)" stroke-width="8"/><circle cx="${s/2}" cy="${s/2}" r="${r}" fill="none" stroke="${c}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C*p} ${C}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="${s/4.2}" font-weight="800" fill="currentColor">${Math.round(p*100)}%</text></svg>`}
+const barra=(p,c)=>`<div class="bar"><i style="width:${Math.round(p*100)}%;${c?'background:'+c:''}"></i></div>`;
+
+/* ---------- Pomodoro ---------- */
+function pomoStart(m){const p=P.pomo;const dur=(m==='work'?p.work:m==='short'?p.short:p.long)*60000;P.pomoRun={m,ini:Date.now(),fin:Date.now()+dur};save();
+ if('Notification' in window&&Notification.permission==='default')try{Notification.requestPermission()}catch(e){}pomoTick();render()}
+function pomoStop(){const r=P.pomoRun;if(r&&r.m==='work'){const min=Math.round((Date.now()-r.ini)/60000);if(min>=1){HD().min+=min;gainXP(min);toast(`Se registraron ${min} min`)}}P.pomoRun=null;save();render()}
+function avisar(t){toast(t);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}if('Notification' in window&&Notification.permission==='granted')try{new Notification('Promoción 2026',{body:t})}catch(e){}}
+function pomoTick(){clearInterval(POMO);POMO=setInterval(()=>{const r=P.pomoRun,bar=$('#pomoBar');
+ if(!r){bar.style.display='none';clearInterval(POMO);return}const left=r.fin-Date.now();bar.style.display='block';
+ bar.textContent=`${r.m==='work'?'⏱ Concentración':'☕ Descanso'} · ${fmt(Math.max(0,Math.ceil(left/1000)))}`;const t=$('#tmr');if(t)t.textContent=fmt(Math.max(0,Math.ceil(left/1000)));
+ if(left<=0){const p=P.pomo;if(r.m==='work'){HD().min+=p.work;gainXP(p.work);p.count++;P.cnt.pomos++;const lg=p.count%p.every===0;P.pomoRun={m:lg?'long':'short',ini:Date.now(),fin:Date.now()+(lg?p.long:p.short)*60000};avisar(lg?'¡Pomodoro completo! Descanso largo.':'¡Pomodoro completo! Toma un descanso.');checkReto();checkBadges()}
+  else{P.pomoRun=null;avisar('Fin del descanso. ¿Listo el siguiente pomodoro?')}save();if(location.hash==='#pomodoro')render()}},1000)}
+
+/* ---------- Navegación ---------- */
+function hdr(){$('#hdrFl span').textContent=racha();$('#hdrXP').textContent=P.xp+' XP · '+rankOf(P.xp).name;$('#hdrDark').textContent=P.dark?'☀️':'🌙'}
+function tema(){document.documentElement.classList.toggle('dark',!!P.dark);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=P.dark?'#14122b':'#f6f4ff';hdr()}
+$('#hdrDark').onclick=()=>{P.dark=!P.dark;save();tema()};
+$('#pomoBar').onclick=()=>location.hash='#pomodoro';
+function setChrome(inS,t){document.body.classList.toggle('ses',inS);$('#back').classList.toggle('hidden',!inS);$('#nav').style.display=inS?'none':'';$('#ttl').textContent=t||'Promoción 2026'}
+$('#back').onclick=()=>{if(S&&!S.done){if(!confirm('¿Salir de la sesión? Lo respondido sí se guarda.'))return;S.done=true;clearInterval(TIMER)}setChrome(false);render()};
+const VW={};
+function render(){clearInterval(TIMER);if(S&&!S.done){S.done=true}setChrome(false);
+ const h=(location.hash||'#inicio').slice(1);const[r,...a]=h.split('/');
+ const tab={inicio:'inicio',camino:'camino',materia:'camino',tema:'camino',practicar:'practicar',simulacro:'practicar',errores:'practicar',logros:'logros'}[r]||'mas';
+ document.querySelectorAll('#nav a').forEach(x=>x.classList.toggle('on',x.dataset.r===tab));
+ if(!BANK&&!['mas','pomodoro','tecnicas'].includes(r)){noBank();hdr();return}
+ (VW[r]||VW.inicio)(...a.map(decodeURIComponent));hdr();scrollTo(0,0)}
+window.addEventListener('hashchange',render);
+function on(id,f){const e=$('#'+id);if(e)e.onclick=f}
+
+function noBank(){V.innerHTML=`<div class="card hero center"><div class="big">🔒</div><h1>Importa tu banco privado</h1>
+<p class="muted">Esta app se publica <b>vacía</b>. Para estudiar, importa el archivo <b>banco_privado.json</b>. Se guarda solo en este teléfono.</p></div>
+<label class="btn xl">Importar banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
+<a class="card info" href="#tecnicas" style="margin-top:14px"><b>🧠 ¿Cómo estudia esta app?</b><div class="muted">Repetición espaciada, recuerdo activo, intercalado, pomodoro y más.</div></a>`;$('#imp').onchange=importBank}
 function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const b=JSON.parse(r.result);
  if(!b.items||!b.temas)throw 0;const old=BANK&&BANK.v||0;if(BANK&&(b.v||0)<old&&!confirm(`Este banco (v${b.v||1}) es más antiguo que el que tienes (v${old}). ¿Reemplazarlo de todos modos?`))return;
- localStorage.setItem(KB,JSON.stringify(b));BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);go('home')}catch(x){alert('El archivo no es un banco válido.')}};r.readAsText(f)}
-function ring(p){const r=34,c=2*Math.PI*r;return `<svg class="ring" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${r}" fill="none" stroke="#e6e1d3" stroke-width="9"/><circle cx="42" cy="42" r="${r}" fill="none" stroke="#d4af37" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c*Math.min(p,1)} ${c}" transform="rotate(-90 42 42)"/><text x="42" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="#1f3b2d">${Math.round(Math.min(p,1)*100)}%</text></svg>`}
-function home(){const d=P.day.d===today()?P.day.n:0,rk=rankOf(P.xp),due=duePool().length,er=errPool().length;
- V.innerHTML=`<div class="card row">${ring(d/P.goal)}<div class="grow"><b>Meta de hoy: ${d}/${P.goal}</b><div class="muted">🔥 Racha: ${P.st.last===today()||P.st.last===new Date(Date.now()-DAY).toLocaleDateString('sv')?P.st.n:0} días</div>
- <div class="muted">🎖️ ${rk.name} · ${P.xp} XP</div><div class="bar" style="margin-top:6px"><i style="width:${(P.xp-rk.prev)*100/(rk.next-rk.prev)}%"></i></div></div></div>
- <button class="btn gold" id="m-day">📅 Repaso del día<small>${due} pendientes por repetición espaciada + nuevas</small></button>
- <div class="grid">
- <button class="btn" id="m-5">⏱️ Mini 5 min<small>Lo que alcances en 5 minutos</small></button>
- <button class="btn" id="m-fast">⚡ Relámpago<small>60 s, combos x2 · récord ${P.best.fast||0}</small></button>
- <button class="btn" id="m-surv">❤️ Supervivencia<small>3 vidas · récord ${P.best.surv||0}</small></button>
- <button class="btn" id="m-err">📕 Errores<small>${er} por reforzar</small></button></div>
- <button class="btn alt" id="m-sim">📝 Simulacro de examen<small>Formato real: opción múltiple con tiempo, calificación al final</small></button>
- <div class="card"><b>Avance por materia</b>${topics().map(t=>`<div style="margin-top:10px" class="row"><span class="grow">${esc(t.n)}</span><span class="muted">${Math.round(mastery(t.id)*100)}%</span></div><div class="bar"><i style="width:${mastery(t.id)*100}%"></i></div>`).join('')}</div>`;
- $('#m-day').onclick=()=>session({title:'Repaso del día',queue:daily(null,P.goal),mode:'leitner'});
- $('#m-5').onclick=()=>session({title:'Mini 5 minutos',queue:daily(null,30),pool:()=>daily(null,30),endless:true,total:300,mode:'leitner'});
- $('#m-fast').onclick=()=>session({title:'Relámpago',queue:shuf(BANK.items),pool:()=>shuf(BANK.items),endless:true,total:60,mode:'fast',auto:true,bestKey:'fast'});
- $('#m-surv').onclick=()=>session({title:'Supervivencia',queue:shuf(BANK.items),pool:()=>shuf(BANK.items),endless:true,lives:3,mode:'mix',bestKey:'surv'});
- $('#m-err').onclick=()=>{const q=shuf(errPool()).slice(0,20);if(!q.length)return toast('No tienes errores pendientes 🎉');session({title:'Cuaderno de errores',queue:q,mode:'leitner'})};
- $('#m-sim').onclick=()=>go('simulacro')}
+ localStorage.setItem(KB,JSON.stringify(b));BANK=b;const keep=b.items.filter(i=>P.it[i.id]).length;toast(`Banco v${b.v||1}: ${b.items.length} preguntas · tu avance se conserva (${keep} ya estudiadas)`);location.hash='#inicio';render()}catch(x){alert('El archivo no es un banco válido.')}};r.readAsText(f)}
+
+const saludo=()=>{const h=new Date().getHours();return h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches'};
+const FR=['Lo que repasas hoy es lo que recuerdas el día del examen.','Pocos minutos, todos los días: así se asciende.','Constancia le gana a la memoria de última hora.','Recordar cuesta; por eso funciona.','Sin prisa y sin pausa, Capitán.'];
+function heat(){let x='';for(let i=27;i>=0;i--){const d=ymd(new Date(Date.now()-i*DAY)),h=P.hd[d],n=h?h.resp+h.min:0;x+=`<i class="${n>=60?'l3':n>=25?'l2':n>0?'l1':''}" title="${d}: ${n}"></i>`}return `<div class="heat">${x}</div>`}
+VW.inicio=()=>{const n=P.goal,dn=HD().resp,rk=rankOf(P.xp),due=duePool().length,er=errPool().length,nw=newPool().length,r=reto(),meta=P.goal*10,xh=P.xpd[today()]||0;
+ V.innerHTML=`<div class="card hero"><div class="muted">${saludo()} · ${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div><h1 style="margin:.2em 0">¡Vamos por el ascenso!</h1><div class="muted">${FR[Math.floor(Date.parse(today())/DAY)%FR.length]}</div>
+ <button class="btn go ${HD().ses?'done':''}" id="g-go" style="margin-top:14px">${HD().ses?'✔ Sesión de hoy hecha · otra ronda':'▶ Empezar sesión guiada'}</button>
+ <div class="muted" style="margin-top:8px;font-size:.78rem">${n} preguntas: repaso vencido + errores + nuevas, intercaladas por materia.</div></div>
+ <div class="grid3"><div class="stat"><b>${due}</b><span>por repasar</span></div><div class="stat"><b>${er}</b><span>errores</span></div><div class="stat"><b>${nw}</b><span>nuevas</span></div></div>
+ <a class="card" href="#logros" style="margin-top:14px"><div class="xpbox">${ring(xh/meta,64,'var(--coral)')}<div class="grow"><b>Meta diaria: ${xh}/${meta} XP</b><div class="muted">🎖️ ${rk.name} · ${P.xp} XP · faltan ${rk.next-P.xp} para ${rk.nextName}</div>${barra((P.xp-rk.prev)/(rk.next-rk.prev))}</div></div></a>
+ <div class="card"><div class="row"><span style="font-size:1.5rem">${r[0]}</span><div class="grow"><b>Reto del día</b><div class="muted">${r[1]}${P.retos[today()]?' · ✔ cumplido':''}</div></div></div>${barra(retoP(),'var(--grad-c)')}</div>
+ <div class="grid2"><button class="btn mint blk" id="g-cards">🃏 Tarjetas<small>Recuerdo activo + autoevaluación</small></button><button class="btn coral blk" id="g-pomo">🍅 Pomodoro<small>${P.pomoRun?'En curso':P.pomo.work+' min de enfoque'}</small></button></div>
+ <div class="card" style="margin-top:14px"><b>Constancia · últimas 4 semanas</b> <span class="muted">🔥 ${racha()} días seguidos</span>${heat()}</div>`;
+ on('g-go',()=>session({title:'Sesión guiada',queue:guided(n),mode:'leitner',onEnd:()=>{}}));
+ on('g-cards',()=>{const q=daily(null,20);session({title:'Tarjetas',queue:q,mode:'cards'})});on('g-pomo',()=>location.hash='#pomodoro')};
+function ttList(t){if(BANK.temario&&BANK.temario.length){return BANK.temario.filter(x=>x.t===t).map(x=>({id:x.id,n:x.tema,bib:x.bib,L:byTT(x.id)}))}
+ const g={};items(t).forEach(i=>(g[i.s]=g[i.s]||[]).push(i));return Object.keys(g).map(s=>({id:'s:'+s,n:s,L:g[s]}))}
+VW.camino=()=>{V.innerHTML=`<div class="card hl"><h1>Camino</h1><div class="muted">Avance por materia y por tema del temario. El dominio sube cuando aciertas en días distintos (repetición espaciada).</div></div>`+
+ topics().map(t=>{const L=items(t.id),m=mastery(L),c=COL[t.id]||'var(--pri)',d=duePool(t.id).length;return `<a class="card" href="#materia/${t.id}"><div class="row"><span class="tag" style="background:${c}22;color:${c}">${t.id}</span><b class="grow">${esc(t.n)}</b><span class="muted">${Math.round(m*100)}%</span></div><div class="mini" style="margin:4px 0 6px">${L.length} preguntas · ${d} por repasar · ${ttList(t.id).length} temas</div>${barra(m,c)}</a>`}).join('')}
 function levels(t){const L=items(t),out=[];for(let i=0;i<L.length;i+=15)out.push(L.slice(i,i+15));return out}
-function temas(){V.innerHTML=topics().map(t=>{const lv=levels(t.id),done=lv.filter((_,i)=>P.lv[t.id+':'+i]).length;
- return `<button class="btn alt" data-t="${t.id}">${esc(t.n)}<small>${t.count||items(t.id).length} preguntas · ${done}/${lv.length} niveles ⭐ · dominio ${Math.round(mastery(t.id)*100)}%${P.lv[t.id+':boss']?' · 👑 jefe vencido':''}</small></button>`}).join('')+
- `<div class="card muted">Materias del temario sin preguntas en el banco: ${BANK.temas.filter(t=>!items(t.id).length).map(t=>esc(t.n)).join(', ')||'ninguna'}.</div>`;
- V.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>go('tema',b.dataset.t))}
-function tema(t){const T=BANK.temas.find(x=>x.id===t),lv=levels(t);let unl=true;
- V.innerHTML=`<div class="card"><h2 style="margin:0">${esc(T.n)}</h2><div class="muted">Cada nivel: 15 preguntas. Gana ⭐ con 80% o más para abrir el siguiente.</div></div>`+
- lv.map((L,i)=>{const k=t+':'+i,ok=P.lv[k],open=unl;unl=unl&&!!ok;const subs=[...new Set(L.map(x=>x.s))].join(' · ');
-  return `<button class="btn ${ok?'':'alt'}" data-l="${i}" ${open?'':'disabled style="opacity:.45"'}>${ok?'⭐':open?'▶️':'🔒'} Nivel ${i+1}<small>${esc(subs)}</small></button>`}).join('')+
- `<button class="btn gold" id="boss">👑 Ronda jefe de ${esc(T.n)}<small>20 preguntas mezcladas del tema · 3 vidas · incluye escribir de memoria</small></button>`;
- V.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{const i=+b.dataset.l;session({title:`${T.n} · Nivel ${i+1}`,queue:shuf(lv[i]),mode:'mix',onEnd:p=>{if(p>=80){P.lv[t+':'+i]=1;S.msg='⭐ ¡Nivel superado!'}else S.msg='Necesitas 80% para la estrella. ¡Otra vez!'}})});
- $('#boss').onclick=()=>session({title:'👑 Jefe: '+T.n,queue:shuf(items(t)).slice(0,20),mode:'boss',lives:3,onEnd:p=>{if(S.lives>0){P.lv[t+':boss']=1;S.msg='👑 ¡Venciste al jefe!'}else S.msg='El jefe ganó esta vez. Repasa errores y vuelve.'}})}
-const _kf=kindFor;kindFor=function(it,mode){if(mode==='boss'){const r=Math.random();return r<.35?mkMC(it):r<.6?mkFill(it):r<.8?mkOrder(it):mkWrite(it)}return _kf(it,mode)};
-function simulacro(){V.innerHTML=`<div class="card"><h2 style="margin-top:0">📝 Simulacro</h2><p class="muted">Como el examen real: opción múltiple, sin ver la respuesta hasta el final y con reloj.</p>
-<label>Materia</label><select id="sm-t"><option value="">Todas (mezcla)</option>${topics().map(t=>`<option value="${t.id}">${esc(t.n)}</option>`).join('')}</select>
-<label style="display:block;margin-top:10px">Número de preguntas</label><input type="number" id="sm-n" value="50" min="10" max="200">
-<label style="display:block;margin-top:10px">Minutos</label><input type="number" id="sm-m" value="50" min="5" max="240">
-<button class="btn gold" id="sm-go" style="margin-top:14px">Comenzar simulacro</button></div>
-<div class="card"><b>Historial</b>${P.hist.filter(h=>h.m==='Simulacro').slice(-8).reverse().map(h=>`<div class="row"><span class="grow">${new Date(h.d).toLocaleDateString('es-MX')}</span><b>${h.ok}/${h.n} (${Math.round(h.ok*100/Math.max(h.n,1))}%)</b></div>`).join('')||'<p class="muted">Aún no hay simulacros.</p>'}</div>`;
- $('#sm-go').onclick=()=>{const t=$('#sm-t').value||null,n=+$('#sm-n').value||50,m=+$('#sm-m').value||50;
-  session({title:'Simulacro',queue:shuf(items(t)).slice(0,n),mode:'exam',silent:true,total:m*60})}}
-function errores(){const L=errPool().sort((a,b)=>st(b.id).ko-st(a.id).ko);
- V.innerHTML=`<div class="card"><b>📕 Cuaderno de errores</b><div class="muted">Preguntas que has fallado y aún no dominas. Salen de aquí cuando las aciertas varias veces seguidas.</div>
- ${L.length?'<button class="btn" id="pe">Practicar 20 errores</button>':''}</div>`+
- (L.length?L.slice(0,150).map(i=>`<div class="card"><span class="chip">✘ ${st(i.id).ko}</span><span class="chip">${esc(i.s)}</span><p>${esc(i.q)}</p><b>${esc(i.a)}</b></div>`).join(''):'<div class="card center">🎉 Sin errores pendientes.</div>');
- const b=$('#pe');if(b)b.onclick=()=>session({title:'Cuaderno de errores',queue:shuf(L).slice(0,20),mode:'leitner'})}
-function ajustes(){V.innerHTML=`<div class="card"><b>Banco de preguntas</b><p class="muted">${BANK?`${BANK.items.length} preguntas · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
-<label class="btn gold">${BANK?'Reemplazar':'Importar'} banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
-${BANK?'<button class="btn alt" id="delb">Quitar banco de este teléfono</button>':''}</div>
-<div class="card"><b>Meta diaria</b><input type="number" id="goal" value="${P.goal}" min="5" max="200"></div>
-<div class="card"><b>Respaldo de tu avance</b><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono. Descarga un respaldo para pasarlo a otro dispositivo.</p>
-<button class="btn alt" id="exp">Descargar respaldo de avance</button><label class="btn alt">Restaurar avance<input type="file" id="impp" accept=".json" hidden></label>
-<button class="btn alt" id="rst">Borrar mi avance</button></div>
-<p class="muted center">Promoción 2026 · v1.2 · Los datos no salen de tu teléfono.</p>`;
+VW.materia=(t)=>{const T=BANK.temas.find(x=>x.id===t);if(!T)return VW.camino();const c=COL[t]||'var(--pri)',tl=ttList(t);
+ V.innerHTML=`<div class="card hl"><a href="#camino" class="muted">‹ Camino</a><h1>${esc(T.n)}</h1><div class="row"><button class="btn sm" id="m-rep">Repaso espaciado</button><button class="btn sm mint" id="m-crd">Tarjetas</button><button class="btn sm coral" id="m-boss">👑 Jefe</button></div></div>
+ <div class="card"><h3>Temas del temario</h3>${tl.map(x=>{const m=mastery(x.L);return `<div class="tt-row" data-tt="${esc(x.id)}"><div class="grow"><div style="font-weight:700;font-size:.92rem">${esc(x.n)}</div><div class="mini">${x.L.length} preguntas${x.bib?' · '+esc(x.bib):''}</div>${barra(m,c)}</div><span class="muted">${x.L.length?Math.round(m*100)+'%':'—'}</span></div>`}).join('')}</div>
+ <div class="card"><h3>Niveles</h3><div class="muted">15 preguntas cada uno. ⭐ con 80 % abre el siguiente.</div>${(()=>{let unl=true;return levels(t).map((L,i)=>{const k=t+':'+i,ok=P.lv[k],open=unl;unl=unl&&!!ok;return `<button class="btn ${ok?'':'sec'} blk" data-l="${i}" ${open?'':'disabled style="opacity:.45"'}>${ok?'⭐':open?'▶️':'🔒'} Nivel ${i+1}</button>`}).join('')})()}</div>`;
+ V.querySelectorAll('[data-tt]').forEach(b=>b.onclick=()=>location.hash='#tema/'+encodeURIComponent(b.dataset.tt));
+ on('m-rep',()=>session({title:T.n+' · Repaso',queue:daily(t,P.goal),mode:'leitner'}));
+ on('m-crd',()=>session({title:T.n+' · Tarjetas',queue:daily(t,20),mode:'cards'}));
+ on('m-boss',()=>session({title:'👑 Jefe: '+T.n,queue:shuf(items(t)).slice(0,20),mode:'boss',lives:3,onEnd:()=>{if(S.lives>0){P.lv[t+':boss']=1;S.msg='👑 ¡Venciste al jefe!'}else S.msg='El jefe ganó esta vez. Repasa errores y vuelve.'}}));
+ V.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{const i=+b.dataset.l;session({title:`${T.n} · Nivel ${i+1}`,queue:shuf(levels(t)[i]),mode:'mix',onEnd:p=>{if(p>=80){P.lv[t+':'+i]=1;S.msg='⭐ ¡Nivel superado!'}else S.msg='Necesitas 80 % para la estrella. ¡Otra vez!'}})})};
+VW.tema=(tt)=>{const L=byTT(tt);const x=(BANK.temario||[]).find(y=>y.id===tt);const name=x?x.tema:tt.replace(/^s:/,'');const t=x?x.t:(L[0]&&L[0].t);
+ const due=L.filter(i=>P.it[i.id]&&P.it[i.id].due<=Date.now()).length,nw=L.filter(i=>!P.it[i.id]).length;
+ V.innerHTML=`<div class="card hl"><a href="#materia/${t}" class="muted">‹ Materia</a><h2>${esc(name)}</h2>${x&&x.bib?`<div class="muted">${esc(x.bib)}</div>`:''}<div class="xpbox" style="margin-top:10px">${ring(mastery(L),70)}<div class="muted">${L.length} preguntas<br>${due} por repasar · ${nw} nuevas</div></div></div>
+ ${L.length?`<button class="btn xl" id="t-rep">🔁 Repaso espaciado (15)</button><button class="btn xl mint" id="t-crd" style="margin-top:10px">🃏 Tarjetas de recuerdo activo</button><button class="btn xl sec" id="t-wr" style="margin-top:10px">✍️ Escribir de memoria</button>`:'<div class="card info">Este tema aún no tiene preguntas en tu banco.</div>'}`;
+ const q=()=>{const d=shuf(L.filter(i=>P.it[i.id]&&P.it[i.id].due<=Date.now()));return d.concat(shuf(L.filter(i=>!d.includes(i)))).slice(0,15)};
+ on('t-rep',()=>session({title:name,queue:q(),mode:'leitner'}));on('t-crd',()=>session({title:name,queue:q(),mode:'cards'}));
+ on('t-wr',()=>{const z=q();session({title:name+' · escribir',queue:z,mode:'boss'})})};
+VW.practicar=()=>{V.innerHTML=`<div class="card hl"><h1>Practicar</h1><div class="muted">Elige un modo. Todo cuenta para tu repetición espaciada.</div></div>
+ <button class="btn xl blk" id="p-day">📅 Repaso del día<small>${duePool().length} vencidas + nuevas · intercaladas</small></button>
+ <div class="grid2" style="margin-top:10px">
+ <button class="btn mint blk" id="p-cards">🃏 Tarjetas<small>Voltea y autoevalúa (SM-2)</small></button>
+ <button class="btn blk" id="p-5">⏱️ Mini 5 min<small>Lo que alcances</small></button>
+ <button class="btn coral blk" id="p-fast">⚡ Relámpago<small>60 s · récord ${P.best.fast||0}</small></button>
+ <button class="btn coral blk" id="p-surv">❤️ Supervivencia<small>3 vidas · récord ${P.best.surv||0}</small></button>
+ <button class="btn sec blk" id="p-err">📕 Errores<small>${errPool().length} por reforzar</small></button>
+ <button class="btn sec blk" id="p-sim">📝 Simulacro<small>Formato examen</small></button></div>`;
+ on('p-day',()=>session({title:'Repaso del día',queue:daily(null,P.goal),mode:'leitner'}));
+ on('p-cards',()=>session({title:'Tarjetas',queue:daily(null,20),mode:'cards'}));
+ on('p-5',()=>session({title:'Mini 5 minutos',queue:daily(null,30),pool:()=>daily(null,30),endless:true,total:300,mode:'leitner'}));
+ on('p-fast',()=>session({title:'Relámpago',queue:shuf(BANK.items),pool:()=>shuf(BANK.items),endless:true,total:60,mode:'fast',auto:true,bestKey:'fast'}));
+ on('p-surv',()=>session({title:'Supervivencia',queue:shuf(BANK.items),pool:()=>shuf(BANK.items),endless:true,lives:3,mode:'mix',bestKey:'surv'}));
+ on('p-err',()=>location.hash='#errores');on('p-sim',()=>location.hash='#simulacro')};
+VW.simulacro=()=>{V.innerHTML=`<div class="card hl"><a href="#practicar" class="muted">‹ Practicar</a><h1>📝 Simulacro</h1><p class="muted">Como el examen real: opción múltiple, sin ver la respuesta hasta el final y con reloj.</p>
+<label class="lb">Materia</label><select id="sm-t"><option value="">Todas (mezcla)</option>${topics().map(t=>`<option value="${t.id}">${esc(t.n)}</option>`).join('')}</select>
+<label class="lb">Número de preguntas</label><input type="number" id="sm-n" value="50" min="10" max="200">
+<label class="lb">Minutos</label><input type="number" id="sm-m" value="50" min="5" max="240">
+<button class="btn xl" id="sm-go" style="margin-top:14px">Comenzar simulacro</button></div>
+<div class="card"><h3>Historial</h3>${P.hist.filter(h=>h.m==='Simulacro').slice(-8).reverse().map(h=>`<div class="task"><span class="grow">${new Date(h.d).toLocaleDateString('es-MX')}</span><b>${h.ok}/${h.n} (${Math.round(h.ok*100/Math.max(h.n,1))}%)</b></div>`).join('')||'<p class="muted">Aún no hay simulacros.</p>'}</div>`;
+ on('sm-go',()=>{const t=$('#sm-t').value||null,n=+$('#sm-n').value||50,m=+$('#sm-m').value||50;session({title:'Simulacro',queue:t?shuf(items(t)).slice(0,n):interleave(shuf(BANK.items).slice(0,n)),mode:'exam',silent:true,total:m*60})})};
+VW.errores=()=>{const L=errPool().sort((a,b)=>st(b.id).ko-st(a.id).ko);
+ V.innerHTML=`<div class="card hl"><a href="#practicar" class="muted">‹ Practicar</a><h1>📕 Cuaderno de errores</h1><div class="muted">Preguntas que has fallado y aún no dominas. Salen de aquí cuando las aciertas varias veces en días distintos.</div>
+ ${L.length?'<button class="btn" id="pe" style="margin-top:10px">Practicar 20 errores</button>':''}</div>`+
+ (L.length?L.slice(0,150).map(i=>`<div class="card"><span class="tag">✘ ${st(i.id).ko}</span> <span class="tag">${esc(i.s||i.t)}</span><p>${esc(i.q)}</p><b>${esc(i.a)}</b>${fuenteH(i)}</div>`).join(''):'<div class="card center">🎉 Sin errores pendientes.</div>');
+ on('pe',()=>session({title:'Cuaderno de errores',queue:shuf(L).slice(0,20),mode:'leitner'}))};
+VW.logros=()=>{const rk=rankOf(P.xp),xh=P.xpd[today()]||0,meta=P.goal*10;let w=0;for(let i=0;i<7;i++)w+=P.xpd[ymd(new Date(Date.now()-i*DAY))]||0;
+ V.innerHTML=`<div class="card hero"><div class="xpbox">${ring((P.xp-rk.prev)/(rk.next-rk.prev),76,'#fff')}<div><h2 style="margin:0">🎖️ ${rk.name}</h2><div class="muted">${P.xp} XP · faltan ${rk.next-P.xp} para ${rk.nextName}</div></div></div></div>
+ <div class="grid3"><div class="stat"><b>${racha()}</b><span>días seguidos</span></div><div class="stat"><b>${xh}</b><span>XP hoy / ${meta}</span></div><div class="stat"><b>${w}</b><span>XP 7 días</span></div></div>
+ <div class="grid3" style="margin-top:10px"><div class="stat"><b>${P.cnt.resp}</b><span>respuestas</span></div><div class="stat"><b>${pct(P.cnt.ok,P.cnt.resp)}%</b><span>aciertos</span></div><div class="stat"><b>${P.cnt.pomos}</b><span>pomodoros</span></div></div>
+ <div class="card" style="margin-top:14px"><h3>Insignias (${Object.keys(P.badges).length}/${BADGES.length})</h3><div class="badges">${BADGES.map(([k,ic,nm,d])=>`<div class="badge ${P.badges[k]?'on':'off'}"><span class="ic" style="background:var(--sup2)">${ic}</span><b>${esc(nm)}</b><br><span class="muted">${esc(d)}</span></div>`).join('')}</div></div>
+ <div class="card"><h3>Dominio por materia</h3>${topics().map(t=>{const m=mastery(items(t.id));return `<div class="row" style="margin-top:8px"><span class="grow">${esc(t.n)}</span><span class="muted">${Math.round(m*100)}%</span></div>${barra(m,COL[t.id])}`}).join('')}</div>
+ <div class="card"><p class="muted">XP: acierto +10 (más bono de combo) · fallo +2 · tarjeta +5 · minuto de pomodoro +1 · sesión completa +15 · reto del día +25.</p></div>`};
+VW.pomodoro=()=>{const p=P.pomo,r=P.pomoRun;const today_p=P.cnt.pomos;
+ V.innerHTML=`<div class="card hl center"><h1>🍅 Pomodoro</h1><span class="tag">${r?(r.m==='work'?'Concentración':'Descanso'):'Listo'}</span>
+ <div class="timer" id="tmr">${r?fmt(Math.max(0,Math.ceil((r.fin-Date.now())/1000))):fmt(p.work*60)}</div>
+ <div class="muted">Ciclo ${p.count%p.every}/${p.every} · ${today_p} pomodoros en total · hoy ${HD().min} min</div>
+ <div class="row" style="justify-content:center;margin-top:12px">${r?`<button class="btn peligro" id="ps">■ Detener</button>${r.m!=='work'?'<button class="btn sec" id="pw">Saltar descanso</button>':''}`:`<button class="btn" id="pw">▶ Enfoque ${p.work} min</button><button class="btn sec" id="psh">Descanso ${p.short}</button><button class="btn sec" id="pl">Largo ${p.long}</button>`}</div></div>
+ <div class="card"><h3>Ajustes</h3><div class="grid3"><div><label class="lb">Enfoque</label><input type="number" id="pa" value="${p.work}" min="5" max="90"></div><div><label class="lb">Descanso</label><input type="number" id="pb" value="${p.short}" min="1" max="30"></div><div><label class="lb">Largo</label><input type="number" id="pc" value="${p.long}" min="5" max="60"></div></div>
+ <p class="muted">Trabaja con el teléfono en «Practicar» durante el enfoque; en el descanso, levántate. Cada ${p.every} pomodoros toca descanso largo. Cada minuto suma 1 XP.</p></div>`;
+ on('pw',()=>pomoStart('work'));on('psh',()=>pomoStart('short'));on('pl',()=>pomoStart('long'));on('ps',pomoStop);
+ ['pa','pb','pc'].forEach((id,i)=>$('#'+id).onchange=e=>{P.pomo[['work','short','long'][i]]=Math.max(1,+e.target.value||1);save()})};
+VW.tecnicas=()=>{V.innerHTML=`<div class="card hl"><a href="#mas" class="muted">‹ Más</a><h1>🧠 Cómo estudia esta app</h1></div>
+ ${[['🔁','Repetición espaciada','Cada pregunta tiene su propio calendario: si la aciertas vuelve en 1, 3, 7 y 15 días; si fallas, vuelve mañana. Las tarjetas usan el algoritmo SM-2 según qué tan fácil la recordaste.'],
+ ['🧠','Recuerdo activo','En las tarjetas primero respondes de memoria y luego volteas. Recordar sin ver las opciones fija mejor que releer.'],
+ ['🔀','Intercalado','La sesión guiada y el repaso mezclan materias para que no salgan dos seguidas iguales; así entrenas a distinguir temas, como en el examen.'],
+ ['📈','Dificultad progresiva','Al principio ves opción múltiple; conforme dominas una pregunta pasas a completar, ordenar y escribir de memoria.'],
+ ['🍅','Pomodoro','Bloques de enfoque de 25 min con descansos de 5 y uno largo cada 4.'],
+ ['📕','Cuaderno de errores','Lo que fallas se repasa primero, con la respuesta literal y su fuente.'],
+ ['📝','Práctica tipo examen','Simulacros con reloj y calificación al final.'],
+ ['🎖️','Motivación','XP, grados, racha, meta diaria, reto del día e insignias.']].map(([i,t,d])=>`<div class="card"><h3>${i} ${t}</h3><div class="muted">${d}</div></div>`).join('')}`};
+VW.mas=()=>{V.innerHTML=`<div class="card hl"><h1>Más</h1></div>
+ <a class="card" href="#pomodoro"><b>🍅 Pomodoro</b><div class="muted">Temporizador de enfoque</div></a>
+ <a class="card" href="#tecnicas"><b>🧠 Técnicas de estudio</b><div class="muted">Cómo funciona la app</div></a>
+ <div class="card"><h3>Banco de preguntas</h3><p class="muted">${BANK?`${BANK.items.length} preguntas · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
+ <label class="btn">${BANK?'Reemplazar':'Importar'} banco (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
+ ${BANK?' <button class="btn sec" id="delb">Quitar banco de este teléfono</button>':''}</div>
+ <div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
+ <div class="card"><h3>Respaldo de tu avance</h3><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono.</p>
+ <div class="row"><button class="btn sec" id="exp">Descargar respaldo</button><label class="btn sec">Restaurar<input type="file" id="impp" accept=".json" hidden></label><button class="btn peligro" id="rst">Borrar avance</button></div></div>
+ <p class="muted center">Promoción 2026 · v2.0 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
- const d=$('#delb');if(d)d.onclick=()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;go('ajustes')}};
- $('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()};
- $('#impp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.it)throw 0;P=x;save();toast('Avance restaurado')}catch(_){alert('Archivo no válido')}};r.readAsText(e.target.files[0])};
- $('#rst').onclick=()=>{if(confirm('¿Borrar todo tu avance?')){localStorage.removeItem(KP);load();toast('Avance borrado')}}}
-load();go('home');
+ on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;render()}});
+ on('exp',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()});
+ $('#impp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.it)throw 0;localStorage.setItem(KP,JSON.stringify(x));load();tema();toast('Avance restaurado')}catch(_){alert('Archivo no válido')}};r.readAsText(e.target.files[0])};
+ on('rst',()=>{if(confirm('¿Borrar todo tu avance?')){localStorage.removeItem(KP);load();tema();toast('Avance borrado');render()}})};
+load();tema();if(P.pomoRun)pomoTick();render();
