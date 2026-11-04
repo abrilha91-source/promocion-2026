@@ -245,10 +245,32 @@ function importBank(e){const f=e.target.files[0];if(!f)return;const r=new FileRe
 const saludo=()=>{const h=new Date().getHours();return h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches'};
 const FR=['Lo que repasas hoy es lo que recuerdas el día del examen.','Pocos minutos, todos los días: así se asciende.','Constancia le gana a la memoria de última hora.','Recordar cuesta; por eso funciona.','Sin prisa y sin pausa, Capitán.'];
 function heat(){let x='';for(let i=27;i>=0;i--){const d=ymd(new Date(Date.now()-i*DAY)),h=P.hd[d],n=h?h.resp+h.min:0;x+=`<i class="${n>=60?'l3':n>=25?'l2':n>0?'l1':''}" title="${d}: ${n}"></i>`}return `<div class="heat">${x}</div>`}
+
+/* ---------- Portada v2.4 (foto solo en este teléfono: IndexedDB p26_foto) ---------- */
+const EXAMEN=new Date(2027,3,12),INI_PREP=new Date(2026,10,4);let FOTO=null;
+const FRM=['Disciplina hoy, orgullo familiar en abril.','Cada pregunta de hoy es una estrella más en el hombro.','El uniforme se honra estudiando también.','Cuidar es mi vocación; ascender, mi compromiso.','La constancia es el arma más fiel de un soldado.','Lo que repasas hoy es lo que recuerdas el día del examen.','Ellas me ven estudiar: que vean también el ascenso.','Firme en la guardia, firme en el estudio.','Sin prisa y sin pausa, Capitán.','Una página más hoy es un día menos de duda en abril.'];
+const frase=()=>FRM[Math.floor(Date.parse(today())/DAY)%FRM.length];
+function diasExamen(){const h=new Date();h.setHours(0,0,0,0);return Math.max(0,Math.round((EXAMEN-h)/DAY))}
+function avanceTiempo(){return Math.max(0,Math.min(1,(Date.now()-INI_PREP)/(EXAMEN-INI_PREP)))}
+const ESTR=n=>'<span class="estr">'+'★'.repeat(n)+'</span>';
+function portada(){const d=diasExamen(),sem=Math.floor(d/7),p=avanceTiempo(),v=P.portada||'a',done=HD().ses;
+ const R=58,C=2*Math.PI*R,anillo=`<svg class="pt-ring" viewBox="0 0 140 140"><defs><linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="#ffc83d"/><stop offset="1" stop-color="#ff7a5c"/></linearGradient></defs><circle cx="70" cy="70" r="${R}" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="10"/><circle cx="70" cy="70" r="${R}" fill="none" stroke="url(#pg)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C*Math.max(.02,p)} ${C}" transform="rotate(-90 70 70)"/></svg>`;
+ const grado=`<div class="pt-grado"><div><small>Hoy</small><b>Cap. 2/o.</b>${ESTR(2)}</div><i>➜</i><div class="meta"><small>12 abr 2027</small><b>Cap. 1/o.</b>${ESTR(3)}</div></div>`;
+ const foto=FOTO?`<img src="${FOTO}" alt="">`:`<span class="pt-add">📷<br>Agrega tu foto<br><small>Por quiénes luchas</small></span>`;
+ const btn=`<button class="btn go ${done?'done':''}" id="g-go">${done?'✔ Sesión de hoy hecha · otra ronda':'▶ Empezar sesión guiada'}</button>`;
+ const fecha=`${saludo()} · ${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}`;
+ if(v==='b')return `<div class="card hero pt pt-b"><div class="kick">${fecha}</div>
+  <div class="pt-top"><div class="pt-cd">${anillo}<div class="pt-num"><b>${d}</b><span>días</span></div></div>
+  <label class="pt-pola" id="pt-foto">${foto}<input type="file" accept="image/*" hidden id="pt-in"><em>Por quiénes lucho</em></label></div>
+  <div class="pt-sub">para el examen · ${sem} semanas · ${Math.round(p*100)} % del camino recorrido</div>
+  <blockquote class="pt-fr">“${frase()}”</blockquote>${grado}${btn}</div>`;
+ return `<div class="card hero pt pt-a${FOTO?' con':''}"><label class="pt-bg" id="pt-foto">${FOTO?`<img src="${FOTO}" alt="">`:''}<input type="file" accept="image/*" hidden id="pt-in"></label><div class="pt-veil"></div>
+  <div class="pt-in"><div class="row"><div class="kick grow">${fecha}</div><label class="pt-chip" for="pt-in">Por quiénes lucho ${FOTO?'✎':'📷'}</label></div>
+  <div class="pt-big"><div class="pt-cd sm">${anillo}<div class="pt-num"><b>${Math.round(p*100)}%</b><span>recorrido</span></div></div><div><div class="pt-dias">${d}</div><div class="pt-lbl">días para el examen<br><small>12 de abril de 2027 · ${sem} semanas</small></div></div></div>
+  <blockquote class="pt-fr">“${frase()}”</blockquote>${grado}${btn}</div></div>`}
+function portadaEv(){const i=$('#pt-in');if(!i)return;i.onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=async()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);const u=c.toDataURL('image/jpeg',.82);URL.revokeObjectURL(im.src);try{await idbSet('p26_foto',u);FOTO=u;toast('Foto guardada solo en este teléfono');render()}catch(x){alert('No se pudo guardar la foto.')}};im.src=URL.createObjectURL(f)}}
 VW.inicio=()=>{const n=P.goal,dn=HD().resp,rk=rankOf(P.xp),due=duePool().length,er=errPool().length,nw=newPool().length,r=reto(),meta=P.goal*10,xh=P.xpd[today()]||0;
- V.innerHTML=`<div class="card hero"><div class="muted">${saludo()} · ${new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div><h1 style="margin:.2em 0">¡Vamos por el ascenso!</h1><div class="muted">${FR[Math.floor(Date.parse(today())/DAY)%FR.length]}</div>
- <button class="btn go ${HD().ses?'done':''}" id="g-go" style="margin-top:14px">${HD().ses?'✔ Sesión de hoy hecha · otra ronda':'▶ Empezar sesión guiada'}</button>
- <div class="muted" style="margin-top:8px;font-size:.78rem">${n} preguntas: repaso vencido + errores + nuevas, intercaladas por materia.</div></div>
+ V.innerHTML=`${portada()}
  ${(()=>{const r=nextRead();return r?`<a class="card info" href="#leer/${r.id}"><b>📖 Primero lee (${Math.max(1,Math.round(r.chars/1200))} min)</b><div class="muted">${esc(r.titulo.slice(0,80))}${P.lastRead&&P.lastRead.id===r.id?' · retomar':''}</div></a>`:LEC?'':`<a class="card info" href="#lectura"><b>📖 Lectura antes de practicar</b><div class="muted">Importa lecturas_privado.json</div></a>`})()}
  <div class="grid2"><a class="btn blk" href="#cuadros">🗂️ Mis cuadros<small>Fichas, mnemotecnias y quiz</small></a><a class="btn sec blk" href="#lectura">📖 Lectura<small>${LEC?lecPct(lecTemas())+' % leído':'Texto literal'}</small></a></div>
  <div class="grid3" style="margin-top:10px"><div class="stat"><b>${due}</b><span>por repasar</span></div><div class="stat"><b>${er}</b><span>errores</span></div><div class="stat"><b>${nw}</b><span>nuevas</span></div></div>
@@ -256,7 +278,7 @@ VW.inicio=()=>{const n=P.goal,dn=HD().resp,rk=rankOf(P.xp),due=duePool().length,
  <div class="card"><div class="row"><span style="font-size:1.5rem">${r[0]}</span><div class="grow"><b>Reto del día</b><div class="muted">${r[1]}${P.retos[today()]?' · ✔ cumplido':''}</div></div></div>${barra(retoP(),'var(--grad-c)')}</div>
  <div class="grid2"><button class="btn mint blk" id="g-cards">🃏 Tarjetas<small>Recuerdo activo + autoevaluación</small></button><button class="btn coral blk" id="g-pomo">🍅 Pomodoro<small>${P.pomoRun?'En curso':P.pomo.work+' min de enfoque'}</small></button></div>
  <div class="card" style="margin-top:14px"><b>Constancia · últimas 4 semanas</b> <span class="muted">🔥 ${racha()} días seguidos</span>${heat()}</div>`;
- on('g-go',()=>session({title:'Sesión guiada',queue:guided(n),mode:'leitner',onEnd:()=>{}}));
+ portadaEv();on('g-go',()=>session({title:'Sesión guiada',queue:guided(n),mode:'leitner',onEnd:()=>{}}));
  on('g-cards',()=>{const q=daily(null,20);session({title:'Tarjetas',queue:q,mode:'cards'})});on('g-pomo',()=>location.hash='#pomodoro')};
 function ttList(t){if(BANK.temario&&BANK.temario.length){return BANK.temario.filter(x=>x.t===t).map(x=>({id:x.id,n:x.tema,bib:x.bib,L:byTT(x.id)}))}
  const g={};items(t).forEach(i=>(g[i.s]=g[i.s]||[]).push(i));return Object.keys(g).map(s=>({id:'s:'+s,n:s,L:g[s]}))}
@@ -338,11 +360,11 @@ VW.mas=()=>{V.innerHTML=`<div class="card hl"><h1>Más</h1></div>
  <div class="card"><h3>Banco de preguntas</h3><p class="muted">${BANK?`${BANK.items.length} preguntas activas (${(BANK._all||BANK.items).length-BANK.items.length} ocultas) · versión ${BANK.v||1} · ${esc(BANK.titulo||'')}`:'No hay banco cargado.'}</p>
  <p class="muted">Lecturas: ${LEC?LEC.temas.length+' temas':'no importadas'} · usa el mismo botón para importar lecturas_privado.json.</p><label class="btn">${BANK?'Reemplazar':'Importar'} banco o lecturas (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label>
  ${BANK?' <button class="btn sec" id="delb">Quitar banco de este teléfono</button>':''}</div>
- <div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
+ <div class="card"><h3>Portada</h3><div class="row"><select id="portSel"><option value="a" ${(P.portada||'a')==='a'?'selected':''}>Póster con mi foto</option><option value="b" ${P.portada==='b'?'selected':''}>Cuenta regresiva + polaroid</option></select>${FOTO?'<button class="btn sm sec" id="fotoDel">Quitar foto</button>':''}</div><div class="muted">Tu foto se guarda solo en este teléfono; nunca se sube.</div></div><div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
  <div class="card"><h3>Respaldo de tu avance</h3><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono.</p>
  <div class="row"><button class="btn sec" id="exp">Descargar respaldo</button><label class="btn sec">Restaurar<input type="file" id="impp" accept=".json" hidden></label><button class="btn peligro" id="rst">Borrar avance</button></div></div>
  <p class="muted center">Promoción 2026 · v2.3 · Los datos no salen de tu teléfono.</p>`;
- $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
+ $('#imp').onchange=importBank;{const ps=$('#portSel');if(ps)ps.onchange=e=>{P.portada=e.target.value;save();toast('Portada cambiada')};const fd=$('#fotoDel');if(fd)fd.onclick=async()=>{if(!confirm('¿Quitar la foto de la portada de este teléfono?'))return;try{await idbSet('p26_foto',null)}catch(e){}FOTO=null;render()}}$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
  on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);idbDel(KB);BANK=null;render()}});
  on('exp',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()});
  $('#impp').onchange=e=>{const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.it)throw 0;localStorage.setItem(KP,JSON.stringify(x));load();tema();toast('Avance restaurado')}catch(_){alert('Archivo no válido')}};r.readAsText(e.target.files[0])};
@@ -397,3 +419,5 @@ VW.leer=(id)=>{P.read=P.read||{};P.fs=P.fs||1;const L=lecTemas(),x=L.find(y=>y.i
  on('pr',()=>{P.read[id]=P.read[id]||Date.now();save();if(!Q.length)return toast('Este tema aún no tiene preguntas');const cards=shuf(Q).slice(0,8);
   session({title:x.titulo.slice(0,40)+' · fichas',queue:cards,mode:'cards',onEnd:()=>{S.msg='Ahora el quiz del tema 👇';setTimeout(()=>session({title:x.titulo.slice(0,40)+' · quiz',queue:shuf(Q).slice(0,15),mode:'leitner'}),1800)}})})};
 if(window.indexedDB)idbGet(KL).then(b=>{if(b&&b.temas){LEC=b;if(/inicio|lectura|leer/.test(location.hash||'#inicio'))render()}}).catch(()=>{});
+
+if(window.indexedDB)idbGet('p26_foto').then(u=>{if(u){FOTO=u;if(/inicio/.test(location.hash||'#inicio'))render()}}).catch(()=>{});
