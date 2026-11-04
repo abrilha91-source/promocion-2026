@@ -60,7 +60,7 @@ function mkFill(it){const w=it.q.split(/\s+/),c=[];w.forEach((x,i)=>{const n=nor
 function mkOrder(it){const w=it.a.split(/\s+/);if(w.length<3||w.length>9)return mkFill(it);return{k:'order',it,q:it.q,words:w,ans:it.a,lbl:'Ordena la respuesta'}}
 function mkWrite(it){return{k:'write',it,q:it.q,ans:it.a,lbl:'Escríbela de memoria'}}
 function mkCard(it){return{k:'card',it,q:it.q,ans:it.a,lbl:'Recuerdo activo · tarjeta'}}
-function kindFor(it,mode){const b=st(it.id).b,r=Math.random();
+function kindFor(it,mode){if(it.nf)return nfKind(it,mode);const b=st(it.id).b,r=Math.random();
  if(mode==='exam')return mkMC(it);
  if(mode==='cards')return mkCard(it);
  if(mode==='fast')return r<.6?mkMC(it):mkTF(it);
@@ -70,6 +70,13 @@ function kindFor(it,mode){const b=st(it.id).b,r=Math.random();
  if(b===2)return r<.4?mkFill(it):r<.7?mkMC(it):mkCard(it);
  if(b===3)return r<.4?mkOrder(it):r<.7?mkFill(it):mkCard(it);
  return r<.45?mkWrite(it):r<.75?mkCard(it):mkOrder(it)}
+/* Reactivos sin huecos (nf): solo opción múltiple, verdadero/falso de concepto o tarjeta completa; nunca completar, ordenar palabras ni escribir */
+function nfKind(it,mode){const f=it.formato||'',r=Math.random();
+ if(f==='tarjeta')return mode==='exam'?mkMC(it):mkCard(it);
+ if(mode==='exam'||mode==='fast')return mkMC(it);
+ if(mode==='cards')return mkCard(it);
+ if((f==='que_es'||f==='def_concepto'||!f)&&r<.2)return mkTF(it);
+ return r<.85?mkMC(it):mkCard(it)}
 function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;
  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
 function writeOK(u,a){u=norm(u).replace(/^(el|la|los|las|lo) /,'');a=norm(a).replace(/^(el|la|los|las|lo) /,'');if(!u)return false;
@@ -318,7 +325,7 @@ VW.mas=()=>{V.innerHTML=`<div class="card hl"><h1>Más</h1></div>
  <div class="card"><h3>Meta diaria</h3><div class="row"><input type="number" id="goal" value="${P.goal}" min="5" max="200" style="width:110px"><span class="muted">preguntas por sesión guiada · meta = ${P.goal*10} XP/día</span></div></div>
  <div class="card"><h3>Respaldo de tu avance</h3><p class="muted">Tu avance (no las preguntas) se guarda solo en este teléfono.</p>
  <div class="row"><button class="btn sec" id="exp">Descargar respaldo</button><label class="btn sec">Restaurar<input type="file" id="impp" accept=".json" hidden></label><button class="btn peligro" id="rst">Borrar avance</button></div></div>
- <p class="muted center">Promoción 2026 · v2.0 · Los datos no salen de tu teléfono.</p>`;
+ <p class="muted center">Promoción 2026 · v2.1 · Los datos no salen de tu teléfono.</p>`;
  $('#imp').onchange=importBank;$('#goal').onchange=e=>{P.goal=Math.max(5,+e.target.value||20);save();toast('Meta guardada')};
  on('delb',()=>{if(confirm('¿Quitar el banco de este teléfono? Tu avance se conserva.')){localStorage.removeItem(KB);BANK=null;render()}});
  on('exp',()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download='avance_promocion_'+today()+'.json';a.click()});
